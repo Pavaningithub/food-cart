@@ -30,8 +30,6 @@ export default function PayPage() {
   const [paying, setPaying] = useState(false);
   const [paid, setPaid] = useState(false);
   const [paymentFailed, setPaymentFailed] = useState(false);
-  // Android UPI: after user returns from UPI app, show confirm screen
-  const [awaitingUpiReturn, setAwaitingUpiReturn] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchOrder = useCallback(async () => {
@@ -58,15 +56,6 @@ export default function PayPage() {
     }, 2500);
   }, [id, router]);
 
-  // When Android customer returns from UPI app, start polling automatically
-  useEffect(() => {
-    if (!awaitingUpiReturn) return;
-    startPolling();
-    // Stop polling after 3 min
-    const timeout = setTimeout(() => { if (pollRef.current) clearInterval(pollRef.current); }, 180000);
-    return () => clearTimeout(timeout);
-  }, [awaitingUpiReturn, startPolling]);
-
   const handlePay = useCallback(async () => {
     if (paying) return;
     setPaying(true);
@@ -84,12 +73,11 @@ export default function PayPage() {
       if (!res.ok) throw new Error(data.error ?? 'Payment init failed');
 
       // ── Android: direct UPI intent URL ──────────────────────────────
-      // No modal — OS shows GPay / PhonePe / Paytm picker immediately
+      // Razorpay callback_url brings customer back to /order/[id] automatically.
+      // Webhook validates payment on the backend — no manual confirm needed.
       if (platform === 'android' && data.upi_url) {
-        setPaying(false);
-        setAwaitingUpiReturn(true);
-        // Small delay so state updates render before navigation
-        setTimeout(() => { window.location.href = data.upi_url; }, 100);
+        // Navigate directly — UPI app opens, on return Razorpay redirects to /order/${id}
+        window.location.href = data.upi_url;
         return;
       }
 
@@ -170,48 +158,6 @@ export default function PayPage() {
     );
   }
 
-  // ── Android: waiting for customer to return from UPI app ────────────
-  if (awaitingUpiReturn) {
-    return (
-      <div className="max-w-lg mx-auto min-h-screen flex flex-col bg-orange-50">
-        <div className="bg-gradient-to-br from-orange-500 to-orange-600 text-white px-6 pt-10 pb-8 text-center">
-          <p className="text-orange-200 text-sm font-semibold mb-1">Your Token</p>
-          <div className="text-8xl font-black tabular-nums leading-none">{order.token_number}</div>
-          <p className="text-orange-100 mt-3 font-medium">{formatCurrency(order.total_amount)}</p>
-        </div>
-        <div className="flex-1 px-4 pt-8 pb-10 space-y-4">
-          <div className="bg-white rounded-2xl p-6 shadow-sm text-center">
-            <div className="text-5xl mb-3">📱</div>
-            <h3 className="font-black text-gray-800 text-xl mb-2">Complete payment in your UPI app</h3>
-            <p className="text-gray-500 text-sm">Approve the ₹{order.total_amount} request in GPay / PhonePe / Paytm</p>
-            <div className="mt-4 flex items-center justify-center gap-2 text-orange-500">
-              <Loader2 size={16} className="animate-spin" />
-              <span className="text-sm font-semibold">Waiting for confirmation…</span>
-            </div>
-          </div>
-
-          <button
-            onClick={() => { startPolling(); toast('Checking payment…'); }}
-            className="w-full bg-orange-500 text-white font-black text-lg py-4 rounded-2xl shadow-lg"
-          >
-            ✅ I've paid — check now
-          </button>
-
-          <button
-            onClick={() => {
-              if (pollRef.current) clearInterval(pollRef.current);
-              setAwaitingUpiReturn(false);
-              setPaymentFailed(true);
-            }}
-            className="w-full text-gray-400 text-sm py-2"
-          >
-            Payment didn't go through? Try again
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   const platform = getPlatform();
 
   return (
@@ -275,12 +221,11 @@ export default function PayPage() {
           )}
         </button>
 
-        {/* Hint text */}
         <p className="text-center text-xs text-gray-400">
           {platform === 'android'
             ? 'Opens GPay / PhonePe / Paytm directly'
             : platform === 'ios'
-            ? 'UPI • Cards • Net Banking via Razorpay'
+            ? 'UPI • Cards • Net Banking'
             : 'Secure payment via Razorpay'}
         </p>
 

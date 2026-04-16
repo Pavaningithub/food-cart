@@ -110,10 +110,24 @@ export async function POST(req: NextRequest) {
         const s2sData = await s2sRes.json();
         // Razorpay returns next[0].url = "upi://pay?pa=...&tr=pay_xxx"
         const upiUrl: string | undefined = s2sData?.next?.[0]?.url;
-        if (upiUrl) {
+        const razorpayPaymentId: string | undefined = s2sData?.razorpay_payment_id;
+        if (upiUrl && razorpayPaymentId) {
+          // Store the payment ID immediately so webhook can match it and
+          // so we can poll Razorpay's API as a fallback if webhook is delayed
+          await supabase.from('payments').upsert(
+            {
+              order_id,
+              razorpay_order_id: razorpayOrderId,
+              razorpay_payment_id: razorpayPaymentId,
+              amount: order.total_amount,
+              currency: 'INR',
+              status: 'created',
+            },
+            { onConflict: 'order_id' }
+          );
           return NextResponse.json({
             upi_url: upiUrl,
-            razorpay_payment_id: s2sData.razorpay_payment_id,
+            razorpay_payment_id: razorpayPaymentId,
             razorpay_order_id: razorpayOrderId,
             amount: amountPaise,
           });
