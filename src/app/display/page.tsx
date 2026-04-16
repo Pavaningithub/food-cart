@@ -14,7 +14,7 @@ export default function DisplayPage() {
     const data = await res.json();
     const all: OrderWithItems[] = data.orders ?? [];
     setReadyOrders(all.filter(o => o.status === 'ready' && o.payment_status === 'paid'));
-    setPreparingOrders(all.filter(o => ['confirmed', 'preparing'].includes(o.status)));
+    setPreparingOrders(all.filter(o => o.status === 'ordered'));
   }, []);
 
   useEffect(() => { fetchOrders(); }, [fetchOrders]);

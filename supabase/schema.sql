@@ -33,7 +33,7 @@ create table if not exists orders (
   order_date date not null default current_date,
   order_type text not null check (order_type in ('dine_in', 'parcel')),
   status text not null default 'pending'
-    check (status in ('pending', 'confirmed', 'preparing', 'ready', 'served', 'cancelled')),
+    check (status in ('ordered', 'ready', 'delivered', 'cancelled')),
   payment_method text check (payment_method in ('online', 'cash')),
   payment_status text not null default 'unpaid'
     check (payment_status in ('unpaid', 'paid', 'failed', 'refunded')),

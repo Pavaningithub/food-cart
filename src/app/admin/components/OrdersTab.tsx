@@ -71,7 +71,7 @@ export default function OrdersTab() {
             className="border rounded-xl px-3 py-2 text-sm"
           >
             <option value="all">All</option>
-            {['pending','confirmed','preparing','ready','served','cancelled'].map(s => (
+            {['ordered','ready','delivered','cancelled'].map(s => (
               <option key={s} value={s}>{ORDER_STATUS_LABELS[s]}</option>
             ))}
           </select>
@@ -152,7 +152,7 @@ export default function OrdersTab() {
                       onChange={(e) => updateOrder(order.id, { status: e.target.value })}
                       className="border rounded-lg px-2 py-1.5 text-xs font-medium"
                     >
-                      {['pending','confirmed','preparing','ready','served','cancelled'].map(s => (
+                      {['ordered','ready','delivered','cancelled'].map(s => (
                         <option key={s} value={s}>{ORDER_STATUS_LABELS[s]}</option>
                       ))}
                     </select>

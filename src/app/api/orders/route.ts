@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
         token_number: tokenData,
         order_date: today,
         order_type,
-        status: 'pending',
+        status: 'ordered',
         payment_status: 'unpaid',
         subtotal,
         parcel_charge: parcelCharge,

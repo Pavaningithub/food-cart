@@ -66,8 +66,8 @@ export default function ParcelPage() {
     }
   };
 
-  const active = orders.filter(o => ['pending', 'confirmed', 'preparing', 'ready'].includes(o.status));
-  const done = orders.filter(o => o.status === 'served');
+  const active = orders.filter(o => ['ordered', 'ready'].includes(o.status));
+  const done = orders.filter(o => o.status === 'delivered');
 
   return (
     <div className="min-h-screen bg-blue-950 text-white" onClick={unlockAudio}>
@@ -158,7 +158,7 @@ export default function ParcelPage() {
                   </button>
                 ) : (
                   <div className="text-center text-blue-400 text-xs font-medium py-2">
-                    {order.status === 'preparing' ? '🔥 Preparing...' : '⏳ Waiting...'}
+                    {order.status === 'ordered' ? '👨‍🍳 Preparing...' : '⏳ Waiting...'}
                   </div>
                 )}
               </div>

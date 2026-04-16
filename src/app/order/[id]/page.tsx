@@ -8,7 +8,7 @@ import { createClient } from '@/lib/supabase/client';
 import QRCode from 'react-qr-code';
 import Link from 'next/link';
 
-const STATUS_STEPS = ['pending', 'confirmed', 'preparing', 'ready', 'served'];
+const STATUS_STEPS = ['ordered', 'ready', 'delivered'];
 
 export default function OrderStatusPage() {
   const { id } = useParams<{ id: string }>();
@@ -94,15 +94,14 @@ export default function OrderStatusPage() {
         <div className="bg-white rounded-2xl p-4 shadow-sm">
           <p className="font-bold text-gray-700 mb-4">Order Status</p>
           <div className="flex items-center justify-between">
-            {STATUS_STEPS.filter(s => s !== 'served').map((step, i) => {
+            {STATUS_STEPS.map((step, i) => {
               const stepIndex = STATUS_STEPS.indexOf(step);
               const done = currentStepIndex > stepIndex;
               const active = currentStepIndex === stepIndex;
               const icons: Record<string, string> = {
-                pending: '📋',
-                confirmed: '✅',
-                preparing: '👨‍🍳',
+                ordered: '📋',
                 ready: '🔔',
+                delivered: '✅',
               };
               return (
                 <div key={step} className="flex flex-col items-center flex-1">
@@ -114,7 +113,7 @@ export default function OrderStatusPage() {
                   <p className={`text-xs mt-1 font-semibold ${active ? 'text-orange-600' : done ? 'text-green-600' : 'text-gray-400'}`}>
                     {ORDER_STATUS_LABELS[step]}
                   </p>
-                  {i < 3 && (
+                  {i < STATUS_STEPS.length - 1 && (
                     <div className="absolute" />
                   )}
                 </div>

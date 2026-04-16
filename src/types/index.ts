@@ -1,4 +1,4 @@
-export type OrderStatus = 'pending' | 'confirmed' | 'preparing' | 'ready' | 'served' | 'cancelled';
+export type OrderStatus = 'ordered' | 'ready' | 'delivered' | 'cancelled';
 export type PaymentStatus = 'unpaid' | 'paid' | 'failed' | 'refunded';
 export type PaymentMethod = 'online' | 'cash';
 export type OrderType = 'dine_in' | 'parcel';

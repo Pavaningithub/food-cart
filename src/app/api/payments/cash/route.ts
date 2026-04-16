@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
       .update({
         payment_status: 'paid',
         payment_method: 'cash',
-        status: 'confirmed',
+        status: 'ordered',
       })
       .eq('id', order_id)
       .select()

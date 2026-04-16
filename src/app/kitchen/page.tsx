@@ -36,7 +36,7 @@ export default function KitchenPage() {
       }
       const justReady = incoming.filter(o =>
         o.status === 'ready' &&
-        prevOrdersRef.current.find(prev => prev.id === o.id && prev.status !== 'ready')
+        prevOrdersRef.current.find(prev => prev.id === o.id && prev.status === 'ordered')
       );
       if (justReady.length > 0) playReadyAlert();
     }
@@ -92,11 +92,11 @@ export default function KitchenPage() {
 
   const displayOrders = orders.filter((o) => {
     if (o.status === 'cancelled') return false;
-    if (filter === 'active') return ['pending', 'confirmed', 'preparing', 'ready'].includes(o.status);
+    if (filter === 'active') return ['ordered', 'ready'].includes(o.status);
     return true;
   });
 
-  const pendingCount = orders.filter(o => ['pending', 'confirmed', 'preparing'].includes(o.status)).length;
+  const pendingCount = orders.filter(o => o.status === 'ordered').length;
   const readyCount = orders.filter(o => o.status === 'ready').length;
 
   return (
@@ -189,22 +189,15 @@ function KitchenCard({
   const isPaid = order.payment_status === 'paid';
 
   const nextStatus: Record<string, string> = {
-    pending: 'confirmed',
-    confirmed: 'preparing',
-    preparing: 'ready',
-    ready: 'served',
+    ordered: 'ready', ready: 'delivered',
   };
-
   const nextLabel: Record<string, string> = {
-    pending: '✅ Confirm',
-    confirmed: '🔥 Start Preparing',
-    preparing: '🔔 Mark Ready',
-    ready: '✓ Served',
+    ordered: '🔔 Mark Ready', ready: '✓ Delivered',
   };
 
   const cardBg = isReady
     ? 'bg-green-900 border-green-500'
-    : order.status === 'preparing'
+    : order.status === 'ordered'
     ? 'bg-orange-950 border-orange-500'
     : 'bg-gray-800 border-gray-700';
 
