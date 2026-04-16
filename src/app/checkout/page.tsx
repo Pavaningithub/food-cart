@@ -14,17 +14,30 @@ export default function CheckoutPage() {
   const [notes, setNotes] = useState('');
   const router = useRouter();
 
-  // Fetch parcel charge from admin settings
+  // Fetch parcel charge — use localStorage cache (5 min) to avoid slow cold-start on every load
   useEffect(() => {
+    const CACHE_KEY = 'ng_settings_cache';
+    const CACHE_TTL = 5 * 60 * 1000;
+    try {
+      const cached = localStorage.getItem(CACHE_KEY);
+      if (cached) {
+        const { ts, settings } = JSON.parse(cached);
+        if (Date.now() - ts < CACHE_TTL) {
+          const s = (settings as { key: string; value: string }[]).find((x) => x.key === 'parcel_charge');
+          if (s) setParcelCharge(Number(s.value));
+          return; // skip network fetch
+        }
+      }
+    } catch { /* ignore */ }
     fetch('/api/admin/settings')
       .then((r) => r.json())
       .then((data) => {
-        const setting = (data.settings ?? []).find(
-          (s: { key: string; value: string }) => s.key === 'parcel_charge'
-        );
+        const all = data.settings ?? [];
+        const setting = all.find((s: { key: string; value: string }) => s.key === 'parcel_charge');
         if (setting) setParcelCharge(Number(setting.value));
+        try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), settings: all })); } catch { /* ignore */ }
       })
-      .catch(() => {}); // keep default 10 on error
+      .catch(() => {});
   }, []);
 
   const sub = subtotal();

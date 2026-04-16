@@ -22,17 +22,6 @@ function getPlatform(): 'android' | 'ios' | 'web' {
   return 'web';
 }
 
-function buildUpiUrl(upiId: string, amount: number, tokenNumber: number) {
-  const params = new URLSearchParams({
-    pa: upiId,
-    pn: "NG's Cafe",
-    am: amount.toFixed(2),
-    tn: `Token ${tokenNumber} - NG's Cafe`,
-    cu: 'INR',
-  });
-  return `upi://pay?${params.toString()}`;
-}
-
 export default function PayPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -42,58 +31,94 @@ export default function PayPage() {
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [paying, setPaying] = useState(false);
+  const [verifying, setVerifying] = useState(false); // polling after UPI app returns
   const [paid, setPaid] = useState(false);
   const [paymentFailed, setPaymentFailed] = useState(false);
+  // 'upi' = UPI-only via Razorpay | 'razorpay' = full methods
   const [paymentMode, setPaymentMode] = useState<'razorpay' | 'upi'>('upi');
-  const [upiId, setUpiId] = useState('');
-  const [upiOpened, setUpiOpened] = useState(false);
-  const [confirmingUpi, setConfirmingUpi] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoTriggered = useRef(false);
 
-  const fetchOrder = useCallback(async () => {
-    const res = await fetch(`/api/orders/${id}`);
-    const data = await res.json();
-    setOrder(data.order);
-    if (data.order?.payment_status === 'paid') setPaid(true);
-    setLoading(false);
+  // ── Parallel-fetch order + settings (settings use localStorage cache) ───
+  useEffect(() => {
+    const CACHE_KEY = 'ng_settings_cache';
+    const CACHE_TTL = 5 * 60 * 1000;
+
+    async function getSettings(): Promise<{ key: string; value: string }[]> {
+      try {
+        const cached = localStorage.getItem(CACHE_KEY);
+        if (cached) {
+          const { ts, settings } = JSON.parse(cached);
+          if (Date.now() - ts < CACHE_TTL) return settings;
+        }
+      } catch { /* ignore */ }
+      const d = await fetch('/api/admin/settings').then((r) => r.json());
+      const all = d.settings ?? [];
+      try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), settings: all })); } catch { /* ignore */ }
+      return all;
+    }
+
+    async function init() {
+      const [orderRes, settings] = await Promise.all([
+        fetch(`/api/orders/${id}`).then((r) => r.json()),
+        getSettings(),
+      ]);
+      setOrder(orderRes.order);
+      if (orderRes.order?.payment_status === 'paid') setPaid(true);
+      const mode = settings.find((x: { key: string }) => x.key === 'payment_mode')?.value as 'razorpay' | 'upi' | undefined;
+      if (mode) setPaymentMode(mode);
+      setLoading(false);
+    }
+    init().catch(() => setLoading(false));
   }, [id]);
 
-  useEffect(() => {
-    fetch('/api/admin/settings')
-      .then((r) => r.json())
-      .then((data) => {
-        const s: { key: string; value: string }[] = data.settings ?? [];
-        const mode = s.find((x) => x.key === 'payment_mode')?.value as 'razorpay' | 'upi' | undefined;
-        const upi = s.find((x) => x.key === 'upi_id')?.value;
-        if (mode) setPaymentMode(mode);
-        if (upi) setUpiId(upi);
-      })
-      .catch(() => {});
-  }, []);
-
-  useEffect(() => { fetchOrder(); }, [fetchOrder]);
   useEffect(() => { return () => { if (pollRef.current) clearInterval(pollRef.current); }; }, []);
 
+  // ── Poll until paid (used after UPI intent + after modal dismiss) ────────
   const startPolling = useCallback(() => {
     if (pollRef.current) return;
+    setVerifying(true);
     pollRef.current = setInterval(async () => {
-      const res = await fetch(`/api/orders/${id}`);
-      const data = await res.json();
+      const data = await fetch(`/api/orders/${id}`).then((r) => r.json());
       if (data.order?.payment_status === 'paid') {
         setPaid(true);
+        setVerifying(false);
         clearInterval(pollRef.current!);
         setTimeout(() => router.push(`/order/${id}`), 1200);
+      } else if (data.order?.payment_status === 'failed') {
+        setPaymentFailed(true);
+        setVerifying(false);
+        clearInterval(pollRef.current!);
+        pollRef.current = null;
       }
     }, 2500);
+    // Stop verifying state after 30s if no result (let user retry)
+    setTimeout(() => {
+      if (pollRef.current) {
+        setVerifying(false); // show retry UI, keep polling quietly
+      }
+    }, 30000);
   }, [id, router]);
 
-  // ── Razorpay payment ────────────────────────────────────────────────────
-  const handleRazorpay = useCallback(async () => {
+  // ── visibilitychange: when user returns from UPI app → start polling ─────
+  useEffect(() => {
+    if (paid) return;
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && paying) {
+        startPolling();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [paying, paid, startPolling]);
+
+  // ── Open Razorpay / UPI intent ───────────────────────────────────────────
+  const handlePay = useCallback(async () => {
     if (paying) return;
     setPaying(true);
     setPaymentFailed(false);
     const platform = getPlatform();
+
     try {
       const res = await fetch('/api/payments/create', {
         method: 'POST',
@@ -103,11 +128,14 @@ export default function PayPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Payment init failed');
 
+      // ── Android: S2S UPI intent → OS opens GPay/PhonePe → webhook confirms ──
       if (platform === 'android' && data.upi_url) {
+        // visibilitychange fires when user returns from UPI app → startPolling()
         window.location.href = data.upi_url;
-        return;
+        return; // paying=true so visibilitychange listener will fire
       }
 
+      // ── iOS / Web: Razorpay checkout.js ─────────────────────────────────
       if (!window.Razorpay) {
         await new Promise<void>((resolve, reject) => {
           const s = document.createElement('script');
@@ -118,6 +146,24 @@ export default function PayPage() {
         });
       }
 
+      // For 'upi' mode: show UPI collect only (customer enters their VPA,
+      // Razorpay pushes a collect request → they approve → webhook fires).
+      // For 'razorpay' mode: show all methods (UPI + Cards + Net Banking).
+      const upiOnlyConfig = paymentMode === 'upi' ? {
+        config: {
+          display: {
+            blocks: {
+              upi: {
+                name: 'Pay via UPI',
+                instruments: [{ method: 'upi' }],
+              },
+            },
+            sequence: ['block.upi'],
+            preferences: { show_default_blocks: false },
+          },
+        },
+      } : {};
+
       const rzp = new window.Razorpay({
         key: data.key_id,
         amount: data.amount,
@@ -126,25 +172,19 @@ export default function PayPage() {
         description: `Token #${order?.token_number}`,
         order_id: data.razorpay_order_id,
         handler: () => {
+          // Payment captured — start polling to confirm via webhook
           setPaying(false);
-          toast.success('Payment successful! 🎉');
           startPolling();
-          router.push(`/order/${id}`);
         },
         prefill: { name: '', email: '', contact: '' },
         theme: { color: '#8B1A1A' },
-        config: {
-          display: {
-            blocks: {
-              upi: { name: 'Pay via UPI', instruments: [{ method: 'upi', flow: 'collect' }] },
-              card: { name: 'Card / Net Banking', instruments: [{ method: 'card' }, { method: 'netbanking' }] },
-            },
-            sequence: ['block.upi', 'block.card'],
-            preferences: { show_default_blocks: false },
-          },
-        },
+        ...upiOnlyConfig,
         modal: {
-          ondismiss: () => { setPaying(false); setPaymentFailed(true); toast('Payment cancelled.'); },
+          ondismiss: () => {
+            setPaying(false);
+            // Start polling quietly — maybe they paid before dismissing
+            startPolling();
+          },
           escape: true,
         },
       });
@@ -154,44 +194,14 @@ export default function PayPage() {
       setPaymentFailed(true);
       toast.error(err instanceof Error ? err.message : 'Payment failed. Please try again.');
     }
-  }, [id, order, paying, router, startPolling]);
+  }, [id, order, paymentMode, paying, startPolling]);
 
-  // ── UPI direct — open app ───────────────────────────────────────────────
-  const handleUpiOpen = useCallback(() => {
-    if (!order || !upiId) return;
-    const upiUrl = buildUpiUrl(upiId, order.total_amount, order.token_number);
-    setUpiOpened(true);
-    window.location.href = upiUrl;
-  }, [order, upiId]);
-
-  // ── UPI direct — customer confirms payment after returning ──────────────
-  const handleUpiConfirm = useCallback(async () => {
-    if (!order) return;
-    setConfirmingUpi(true);
-    try {
-      const res = await fetch('/api/payments/upi-confirm', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ order_id: id }),
-      });
-      if (!res.ok) throw new Error();
-      setPaid(true);
-      setTimeout(() => router.push(`/order/${id}`), 1200);
-    } catch {
-      toast.error('Could not confirm payment. Please show receipt to staff.');
-    } finally {
-      setConfirmingUpi(false);
-    }
-  }, [id, order, router]);
-
-  // Auto-trigger Razorpay when ?auto=1
+  // Auto-trigger on ?auto=1
   useEffect(() => {
     if (!isAuto || autoTriggered.current || loading || !order || paid) return;
-    if (paymentMode === 'razorpay') {
-      autoTriggered.current = true;
-      handleRazorpay();
-    }
-  }, [isAuto, loading, order, paid, paymentMode, handleRazorpay]);
+    autoTriggered.current = true;
+    handlePay();
+  }, [isAuto, loading, order, paid, handlePay]);
 
   if (loading) {
     return (
@@ -246,8 +256,7 @@ export default function PayPage() {
               (order as any).order_items?.map((item: any) => (
                 <div key={item.id} className="flex justify-between text-sm">
                   <span className="text-gray-700">
-                    {item.product_name_en}{' '}
-                    <span className="text-gray-400">×{item.quantity}</span>
+                    {item.product_name_en} <span className="text-gray-400">×{item.quantity}</span>
                   </span>
                   <span className="font-semibold">{formatCurrency(item.subtotal)}</span>
                 </div>
@@ -267,95 +276,58 @@ export default function PayPage() {
           </div>
         </div>
 
+        {/* Verifying state — shown after UPI app returns or modal closes */}
+        {verifying && (
+          <div className="bg-blue-50 border border-blue-200 rounded-2xl px-4 py-4 text-center space-y-2">
+            <Loader2 size={24} className="animate-spin text-blue-500 mx-auto" />
+            <p className="text-blue-700 font-bold text-sm">Verifying your payment…</p>
+            <p className="text-blue-500 text-xs">This usually takes a few seconds</p>
+          </div>
+        )}
+
         {/* Failed banner */}
-        {paymentFailed && (
+        {paymentFailed && !verifying && (
           <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-2xl px-4 py-3">
             <XCircle size={20} className="text-red-500 shrink-0" />
             <div>
               <p className="text-red-700 text-sm font-bold">Payment did not go through</p>
-              <p className="text-red-500 text-xs mt-0.5">Try again or pay at the counter</p>
+              <p className="text-red-500 text-xs mt-0.5">Try again below or pay at the counter</p>
             </div>
           </div>
         )}
 
-        {/* ── UPI DIRECT MODE ── */}
-        {paymentMode === 'upi' && (
-          <>
-            <div className="bg-white rounded-2xl p-4 shadow-sm text-center space-y-1">
-              <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Pay via UPI to</p>
-              <p className="text-xl font-black text-brand">{upiId || '…'}</p>
-              <p className="text-sm text-gray-500">NG&apos;s Cafe · Token #{order.token_number}</p>
-            </div>
-
-            {!upiOpened ? (
-              <button
-                onClick={handleUpiOpen}
-                disabled={!upiId}
-                className="w-full bg-brand hover:bg-brand-dark active:scale-[0.98] text-white font-black text-xl py-5 rounded-2xl shadow-xl transition-all disabled:opacity-70 flex items-center justify-center gap-3"
-              >
-                📱 Pay {formatCurrency(order.total_amount)} via UPI
-              </button>
+        {/* Pay button */}
+        {!verifying && (
+          <button
+            onClick={handlePay}
+            disabled={paying}
+            className="w-full bg-brand hover:bg-brand-dark active:scale-[0.98] text-white font-black text-xl py-5 rounded-2xl shadow-xl transition-all disabled:opacity-70 flex items-center justify-center gap-3"
+          >
+            {paying ? (
+              <><Loader2 size={22} className="animate-spin" /> Opening…</>
+            ) : paymentFailed ? (
+              <>🔄 Try Again — {formatCurrency(order.total_amount)}</>
+            ) : platform === 'android' ? (
+              <>📱 Pay {formatCurrency(order.total_amount)} via UPI</>
+            ) : paymentMode === 'upi' ? (
+              <>📱 Pay {formatCurrency(order.total_amount)} via UPI</>
             ) : (
-              <div className="space-y-3">
-                <div className="bg-blue-50 border border-blue-200 rounded-2xl px-4 py-3 text-center">
-                  <p className="text-blue-700 text-sm font-bold">Complete the payment in your UPI app</p>
-                  <p className="text-blue-500 text-xs mt-1">Then tap the button below to confirm</p>
-                </div>
-                <button
-                  onClick={handleUpiConfirm}
-                  disabled={confirmingUpi}
-                  className="w-full bg-green-600 hover:bg-green-700 active:scale-[0.98] text-white font-black text-lg py-4 rounded-2xl shadow-xl transition-all disabled:opacity-70 flex items-center justify-center gap-2"
-                >
-                  {confirmingUpi ? <><Loader2 size={20} className="animate-spin" /> Confirming…</> : '✅ I have paid'}
-                </button>
-                <button
-                  onClick={handleUpiOpen}
-                  className="w-full bg-white border-2 border-brand/30 text-brand font-semibold py-3 rounded-2xl text-sm transition-all"
-                >
-                  Re-open UPI app
-                </button>
-              </div>
+              <>💳 Pay {formatCurrency(order.total_amount)}</>
             )}
-
-            {/* iOS / web fallback instructions */}
-            {(platform === 'ios' || platform === 'web') && !upiOpened && (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 text-sm text-yellow-800 space-y-1">
-                <p className="font-bold">If UPI app doesn&apos;t open automatically:</p>
-                <p>Open GPay / PhonePe / Paytm and pay to:</p>
-                <p className="font-black text-base">{upiId}</p>
-                <p>Amount: <span className="font-bold">{formatCurrency(order.total_amount)}</span> · Note: Token #{order.token_number}</p>
-              </div>
-            )}
-          </>
+          </button>
         )}
 
-        {/* ── RAZORPAY MODE ── */}
-        {paymentMode === 'razorpay' && (
-          <>
-            <button
-              onClick={handleRazorpay}
-              disabled={paying}
-              className="w-full bg-brand hover:bg-brand-dark active:scale-[0.98] text-white font-black text-xl py-5 rounded-2xl shadow-xl transition-all disabled:opacity-70 flex items-center justify-center gap-3"
-            >
-              {paying ? (
-                <><Loader2 size={22} className="animate-spin" /> Opening…</>
-              ) : platform === 'android' ? (
-                <>🚀 Pay {formatCurrency(order.total_amount)} via UPI</>
-              ) : (
-                <>💳 Pay {formatCurrency(order.total_amount)}</>
-              )}
-            </button>
-            <p className="text-center text-xs text-gray-400">
-              {platform === 'android'
-                ? 'Opens GPay / PhonePe / Paytm directly'
-                : platform === 'ios'
-                ? 'UPI • Cards • Net Banking'
-                : 'Secure payment via Razorpay'}
-            </p>
-          </>
+        {!verifying && (
+          <p className="text-center text-xs text-gray-400">
+            {platform === 'android'
+              ? 'Opens GPay · PhonePe · Paytm — payment confirmed automatically'
+              : paymentMode === 'upi'
+              ? 'Enter your UPI ID (e.g. name@okaxis) — Razorpay sends a collect request'
+              : 'UPI · Cards · Net Banking — secured by Razorpay'}
+          </p>
         )}
 
-        {/* Cash fallback */}
+        {/* Cash fallback — always visible */}
         <button
           onClick={() => router.push(`/order/${id}?cash=1`)}
           className="w-full bg-white border-2 border-gray-200 hover:border-brand/40 text-gray-600 font-semibold py-3.5 rounded-2xl transition-all flex items-center justify-center gap-2"

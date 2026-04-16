@@ -84,7 +84,6 @@ function ChangePinSection() {
 // ── Payment Mode Component ────────────────────────────────────────────────
 function PaymentModeSection() {
   const [mode, setMode] = useState<'upi' | 'razorpay'>('upi');
-  const [upiId, setUpiId] = useState('');
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
@@ -94,9 +93,7 @@ function PaymentModeSection() {
       .then((data) => {
         const s: { key: string; value: string }[] = data.settings ?? [];
         const m = s.find((x) => x.key === 'payment_mode')?.value as 'upi' | 'razorpay' | undefined;
-        const u = s.find((x) => x.key === 'upi_id')?.value;
         if (m) setMode(m);
-        if (u) setUpiId(u);
         setLoaded(true);
       })
       .catch(() => setLoaded(true));
@@ -105,11 +102,14 @@ function PaymentModeSection() {
   const save = async () => {
     setSaving(true);
     try {
-      await Promise.all([
-        fetch('/api/admin/settings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: 'payment_mode', value: mode }) }),
-        fetch('/api/admin/settings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: 'upi_id', value: upiId }) }),
-      ]);
-      toast.success('Payment settings saved!');
+      await fetch('/api/admin/settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: 'payment_mode', value: mode }),
+      });
+      // Bust localStorage settings cache so pay page picks up new mode immediately
+      try { localStorage.removeItem('ng_settings_cache'); } catch { /* ignore */ }
+      toast.success('Payment mode saved!');
     } catch {
       toast.error('Failed to save');
     } finally {
@@ -122,17 +122,17 @@ function PaymentModeSection() {
   return (
     <div className="bg-white rounded-2xl shadow-sm p-5">
       <h3 className="font-black text-gray-800 mb-1 text-lg">💳 Payment Mode</h3>
-      <p className="text-xs text-gray-400 mb-4">Choose how customers pay online</p>
+      <p className="text-xs text-gray-400 mb-4">Choose how customers pay online. Both modes use Razorpay and confirm automatically via webhook — no manual verification needed.</p>
 
-      <div className="flex gap-2 mb-5">
+      <div className="flex gap-2 mb-4">
         <button
           onClick={() => setMode('upi')}
           className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all ${
             mode === 'upi' ? 'bg-brand text-white shadow' : 'bg-gray-100 text-gray-600'
           }`}
         >
-          📱 Direct UPI
-          <span className="block text-xs font-normal opacity-75 mt-0.5">0% fee · instant</span>
+          📱 UPI Only
+          <span className="block text-xs font-normal opacity-75 mt-0.5">GPay · PhonePe · Paytm</span>
         </button>
         <button
           onClick={() => setMode('razorpay')}
@@ -140,29 +140,24 @@ function PaymentModeSection() {
             mode === 'razorpay' ? 'bg-brand text-white shadow' : 'bg-gray-100 text-gray-600'
           }`}
         >
-          🔒 Razorpay
-          <span className="block text-xs font-normal opacity-75 mt-0.5">2% fee · auto-confirmed</span>
+          💳 All Methods
+          <span className="block text-xs font-normal opacity-75 mt-0.5">UPI + Cards + Net Banking</span>
         </button>
       </div>
 
-      <div className="space-y-1 mb-4">
-        <label className="text-sm font-bold text-gray-700">UPI ID</label>
-        <p className="text-xs text-gray-400">Your UPI ID where customers send money (e.g. 9731874874@upi)</p>
-        <input
-          type="text"
-          value={upiId}
-          onChange={(e) => setUpiId(e.target.value)}
-          placeholder="yourname@upi"
-          className="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand"
-        />
+      <div className={`rounded-xl p-3 mb-4 text-xs ${mode === 'upi' ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'}`}>
+        {mode === 'upi'
+          ? '✅ Android: opens UPI app directly · iOS: customer enters UPI ID, gets a push notification to approve. Auto-confirmed via Razorpay webhook.'
+          : '✅ All platforms: Razorpay checkout with UPI, Debit/Credit Cards, Net Banking. Auto-confirmed via webhook.'}
+        <span className="block mt-1 font-semibold">Fee: 2% per transaction (Razorpay standard)</span>
       </div>
 
       <button
         onClick={save}
-        disabled={saving || !upiId}
+        disabled={saving}
         className="w-full bg-brand hover:bg-brand-dark text-white py-2.5 rounded-xl font-bold text-sm disabled:opacity-60"
       >
-        {saving ? 'Saving…' : 'Save Payment Settings'}
+        {saving ? 'Saving…' : 'Save Payment Mode'}
       </button>
     </div>
   );
