@@ -67,13 +67,12 @@ export default function CheckoutPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
 
-      clearCart();
-
       if (paymentMethod === 'online') {
-        // ?auto=1 tells the pay page to trigger payment immediately
         router.push(`/pay/${data.order.id}?auto=1`);
+        clearCart();
       } else {
         router.push(`/order/${data.order.id}?cash=1`);
+        clearCart();
       }
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : 'Failed to place order');

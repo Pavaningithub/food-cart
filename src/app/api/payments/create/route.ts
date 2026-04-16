@@ -79,64 +79,57 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ── Android: S2S UPI intent — returns upi:// URL directly ──────────
-    // Customer is redirected straight to OS UPI app chooser, no modal.
+    // ── Android: try S2S UPI intent first ─────────────────────────────
     if (platform === 'android') {
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
-      const credentials = Buffer.from(`${process.env.RAZORPAY_KEY_ID}:${process.env.RAZORPAY_KEY_SECRET}`).toString('base64');
-      const s2sRes = await fetch('https://api.razorpay.com/v1/payments', {
-        method: 'POST',
-        headers: {
-          Authorization: `Basic ${credentials}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          order_id: razorpayOrderId,
-          method: 'upi',
-          contact: '9999999999',       // placeholder — not stored, just Razorpay API requirement
-          email: 'pay@foodcart.app',   // placeholder
-          amount: amountPaise,
-          currency: 'INR',
-          ip: req.headers.get('x-forwarded-for') ?? '1.1.1.1',
-          referrer: `${appUrl}/pay/${order_id}`,
-          user_agent: req.headers.get('user-agent') ?? 'Mozilla/5.0',
-          description: `FoodCart Token #${order.token_number}`,
-          callback_url: `${appUrl}/order/${order_id}`,
-          upi: { flow: 'intent' },
-        }),
-      });
-
-      if (s2sRes.ok) {
-        const s2sData = await s2sRes.json();
-        // Razorpay returns next[0].url = "upi://pay?pa=...&tr=pay_xxx"
-        const upiUrl: string | undefined = s2sData?.next?.[0]?.url;
-        const razorpayPaymentId: string | undefined = s2sData?.razorpay_payment_id;
-        if (upiUrl && razorpayPaymentId) {
-          // Store the payment ID immediately so webhook can match it and
-          // so we can poll Razorpay's API as a fallback if webhook is delayed
-          await supabase.from('payments').upsert(
-            {
-              order_id,
-              razorpay_order_id: razorpayOrderId,
-              razorpay_payment_id: razorpayPaymentId,
-              amount: order.total_amount,
-              currency: 'INR',
-              status: 'created',
-            },
-            { onConflict: 'order_id' }
-          );
-          return NextResponse.json({
-            upi_url: upiUrl,
-            razorpay_payment_id: razorpayPaymentId,
-            razorpay_order_id: razorpayOrderId,
+      try {
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
+        const credentials = Buffer.from(`${process.env.RAZORPAY_KEY_ID}:${process.env.RAZORPAY_KEY_SECRET}`).toString('base64');
+        const s2sRes = await fetch('https://api.razorpay.com/v1/payments', {
+          method: 'POST',
+          headers: {
+            Authorization: `Basic ${credentials}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            order_id: razorpayOrderId,
+            method: 'upi',
+            contact: '9999999999',
+            email: 'pay@ngscafe.app',
             amount: amountPaise,
-          });
+            currency: 'INR',
+            ip: req.headers.get('x-forwarded-for') ?? '1.1.1.1',
+            referrer: `${appUrl}/pay/${order_id}`,
+            user_agent: req.headers.get('user-agent') ?? 'Mozilla/5.0',
+            description: `NG's Cafe Token #${order.token_number}`,
+            callback_url: `${appUrl}/order/${order_id}`,
+            upi: { flow: 'intent' },
+          }),
+        });
+        if (s2sRes.ok) {
+          const s2sData = await s2sRes.json();
+          const upiUrl: string | undefined = s2sData?.next?.[0]?.url;
+          const razorpayPaymentId: string | undefined = s2sData?.razorpay_payment_id;
+          if (upiUrl && razorpayPaymentId) {
+            await supabase.from('payments').upsert(
+              { order_id, razorpay_order_id: razorpayOrderId, razorpay_payment_id: razorpayPaymentId, amount: order.total_amount, currency: 'INR', status: 'created' },
+              { onConflict: 'order_id' }
+            );
+            return NextResponse.json({
+              upi_url: upiUrl,
+              razorpay_payment_id: razorpayPaymentId,
+              razorpay_order_id: razorpayOrderId,
+              amount: amountPaise,
+              key_id: process.env.RAZORPAY_KEY_ID,
+            });
+          }
         }
+      } catch (s2sErr) {
+        console.warn('S2S intent failed, falling back to checkout modal:', s2sErr);
       }
-      // S2S failed — fall through and return standard checkout data so client falls back to modal
+      // S2S failed — fall through to standard checkout modal
     }
 
-    // ── iOS / web: standard Razorpay checkout.js modal ─────────────────
+    // ── iOS / web / Android fallback: standard Razorpay checkout.js modal ──
     return NextResponse.json({
       razorpay_order_id: razorpayOrderId,
       amount: amountPaise,
