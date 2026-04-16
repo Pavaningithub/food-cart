@@ -81,6 +81,93 @@ function ChangePinSection() {
   );
 }
 
+// ── Payment Mode Component ────────────────────────────────────────────────
+function PaymentModeSection() {
+  const [mode, setMode] = useState<'upi' | 'razorpay'>('upi');
+  const [upiId, setUpiId] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/admin/settings')
+      .then((r) => r.json())
+      .then((data) => {
+        const s: { key: string; value: string }[] = data.settings ?? [];
+        const m = s.find((x) => x.key === 'payment_mode')?.value as 'upi' | 'razorpay' | undefined;
+        const u = s.find((x) => x.key === 'upi_id')?.value;
+        if (m) setMode(m);
+        if (u) setUpiId(u);
+        setLoaded(true);
+      })
+      .catch(() => setLoaded(true));
+  }, []);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await Promise.all([
+        fetch('/api/admin/settings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: 'payment_mode', value: mode }) }),
+        fetch('/api/admin/settings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: 'upi_id', value: upiId }) }),
+      ]);
+      toast.success('Payment settings saved!');
+    } catch {
+      toast.error('Failed to save');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!loaded) return <div className="h-24 bg-gray-100 rounded-2xl animate-pulse" />;
+
+  return (
+    <div className="bg-white rounded-2xl shadow-sm p-5">
+      <h3 className="font-black text-gray-800 mb-1 text-lg">💳 Payment Mode</h3>
+      <p className="text-xs text-gray-400 mb-4">Choose how customers pay online</p>
+
+      <div className="flex gap-2 mb-5">
+        <button
+          onClick={() => setMode('upi')}
+          className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all ${
+            mode === 'upi' ? 'bg-brand text-white shadow' : 'bg-gray-100 text-gray-600'
+          }`}
+        >
+          📱 Direct UPI
+          <span className="block text-xs font-normal opacity-75 mt-0.5">0% fee · instant</span>
+        </button>
+        <button
+          onClick={() => setMode('razorpay')}
+          className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all ${
+            mode === 'razorpay' ? 'bg-brand text-white shadow' : 'bg-gray-100 text-gray-600'
+          }`}
+        >
+          🔒 Razorpay
+          <span className="block text-xs font-normal opacity-75 mt-0.5">2% fee · auto-confirmed</span>
+        </button>
+      </div>
+
+      <div className="space-y-1 mb-4">
+        <label className="text-sm font-bold text-gray-700">UPI ID</label>
+        <p className="text-xs text-gray-400">Your UPI ID where customers send money (e.g. 9731874874@upi)</p>
+        <input
+          type="text"
+          value={upiId}
+          onChange={(e) => setUpiId(e.target.value)}
+          placeholder="yourname@upi"
+          className="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand"
+        />
+      </div>
+
+      <button
+        onClick={save}
+        disabled={saving || !upiId}
+        className="w-full bg-brand hover:bg-brand-dark text-white py-2.5 rounded-xl font-bold text-sm disabled:opacity-60"
+      >
+        {saving ? 'Saving…' : 'Save Payment Settings'}
+      </button>
+    </div>
+  );
+}
+
 // ── Daily Report Component ─────────────────────────────────────────────────
 function DailyReportSection() {
   const today = new Date().toISOString().split('T')[0];
@@ -242,6 +329,9 @@ export default function SettingsTab() {
           </div>
         )}
       </div>
+
+      {/* Payment Mode */}
+      <PaymentModeSection />
 
       {/* Change PIN */}
       <ChangePinSection />

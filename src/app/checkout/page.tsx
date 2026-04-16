@@ -57,7 +57,8 @@ export default function CheckoutPage() {
       clearCart();
 
       if (paymentMethod === 'online') {
-        router.push(`/pay/${data.order.id}`);
+        // ?auto=1 tells the pay page to trigger payment immediately
+        router.push(`/pay/${data.order.id}?auto=1`);
       } else {
         router.push(`/order/${data.order.id}?cash=1`);
       }

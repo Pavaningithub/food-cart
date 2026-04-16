@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Order } from '@/types';
 import { formatCurrency } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -22,15 +22,34 @@ function getPlatform(): 'android' | 'ios' | 'web' {
   return 'web';
 }
 
+function buildUpiUrl(upiId: string, amount: number, tokenNumber: number) {
+  const params = new URLSearchParams({
+    pa: upiId,
+    pn: "NG's Cafe",
+    am: amount.toFixed(2),
+    tn: `Token ${tokenNumber} - NG's Cafe`,
+    cu: 'INR',
+  });
+  return `upi://pay?${params.toString()}`;
+}
+
 export default function PayPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const isAuto = searchParams.get('auto') === '1';
+
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [paying, setPaying] = useState(false);
   const [paid, setPaid] = useState(false);
   const [paymentFailed, setPaymentFailed] = useState(false);
+  const [paymentMode, setPaymentMode] = useState<'razorpay' | 'upi'>('upi');
+  const [upiId, setUpiId] = useState('');
+  const [upiOpened, setUpiOpened] = useState(false);
+  const [confirmingUpi, setConfirmingUpi] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const autoTriggered = useRef(false);
 
   const fetchOrder = useCallback(async () => {
     const res = await fetch(`/api/orders/${id}`);
@@ -39,6 +58,19 @@ export default function PayPage() {
     if (data.order?.payment_status === 'paid') setPaid(true);
     setLoading(false);
   }, [id]);
+
+  useEffect(() => {
+    fetch('/api/admin/settings')
+      .then((r) => r.json())
+      .then((data) => {
+        const s: { key: string; value: string }[] = data.settings ?? [];
+        const mode = s.find((x) => x.key === 'payment_mode')?.value as 'razorpay' | 'upi' | undefined;
+        const upi = s.find((x) => x.key === 'upi_id')?.value;
+        if (mode) setPaymentMode(mode);
+        if (upi) setUpiId(upi);
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => { fetchOrder(); }, [fetchOrder]);
   useEffect(() => { return () => { if (pollRef.current) clearInterval(pollRef.current); }; }, []);
@@ -56,13 +88,12 @@ export default function PayPage() {
     }, 2500);
   }, [id, router]);
 
-  const handlePay = useCallback(async () => {
+  // ── Razorpay payment ────────────────────────────────────────────────────
+  const handleRazorpay = useCallback(async () => {
     if (paying) return;
     setPaying(true);
     setPaymentFailed(false);
-
     const platform = getPlatform();
-
     try {
       const res = await fetch('/api/payments/create', {
         method: 'POST',
@@ -72,16 +103,11 @@ export default function PayPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Payment init failed');
 
-      // ── Android: direct UPI intent URL ──────────────────────────────
-      // Razorpay callback_url brings customer back to /order/[id] automatically.
-      // Webhook validates payment on the backend — no manual confirm needed.
       if (platform === 'android' && data.upi_url) {
-        // Navigate directly — UPI app opens, on return Razorpay redirects to /order/${id}
         window.location.href = data.upi_url;
         return;
       }
 
-      // ── iOS / web: Razorpay checkout.js modal ────────────────────────
       if (!window.Razorpay) {
         await new Promise<void>((resolve, reject) => {
           const s = document.createElement('script');
@@ -106,7 +132,7 @@ export default function PayPage() {
           router.push(`/order/${id}`);
         },
         prefill: { name: '', email: '', contact: '' },
-        theme: { color: '#f97316' },
+        theme: { color: '#8B1A1A' },
         config: {
           display: {
             blocks: {
@@ -118,7 +144,7 @@ export default function PayPage() {
           },
         },
         modal: {
-          ondismiss: () => { setPaying(false); toast('Payment cancelled.'); },
+          ondismiss: () => { setPaying(false); setPaymentFailed(true); toast('Payment cancelled.'); },
           escape: true,
         },
       });
@@ -129,6 +155,43 @@ export default function PayPage() {
       toast.error(err instanceof Error ? err.message : 'Payment failed. Please try again.');
     }
   }, [id, order, paying, router, startPolling]);
+
+  // ── UPI direct — open app ───────────────────────────────────────────────
+  const handleUpiOpen = useCallback(() => {
+    if (!order || !upiId) return;
+    const upiUrl = buildUpiUrl(upiId, order.total_amount, order.token_number);
+    setUpiOpened(true);
+    window.location.href = upiUrl;
+  }, [order, upiId]);
+
+  // ── UPI direct — customer confirms payment after returning ──────────────
+  const handleUpiConfirm = useCallback(async () => {
+    if (!order) return;
+    setConfirmingUpi(true);
+    try {
+      const res = await fetch('/api/payments/upi-confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order_id: id }),
+      });
+      if (!res.ok) throw new Error();
+      setPaid(true);
+      setTimeout(() => router.push(`/order/${id}`), 1200);
+    } catch {
+      toast.error('Could not confirm payment. Please show receipt to staff.');
+    } finally {
+      setConfirmingUpi(false);
+    }
+  }, [id, order, router]);
+
+  // Auto-trigger Razorpay when ?auto=1
+  useEffect(() => {
+    if (!isAuto || autoTriggered.current || loading || !order || paid) return;
+    if (paymentMode === 'razorpay') {
+      autoTriggered.current = true;
+      handleRazorpay();
+    }
+  }, [isAuto, loading, order, paid, paymentMode, handleRazorpay]);
 
   if (loading) {
     return (
@@ -151,7 +214,9 @@ export default function PayPage() {
       <div className="max-w-lg mx-auto px-4 py-20 text-center">
         <CheckCircle size={72} className="mx-auto text-green-500 mb-4" />
         <h2 className="text-3xl font-black text-green-600 mb-2">Payment Done! 🎉</h2>
-        <p className="text-gray-500 mb-2">Token <span className="font-black text-brand text-xl">#{order.token_number}</span></p>
+        <p className="text-gray-500 mb-2">
+          Token <span className="font-black text-brand text-xl">#{order.token_number}</span>
+        </p>
         <p className="text-gray-400 text-sm">Taking you to your order…</p>
         <div className="mt-6 animate-spin w-6 h-6 border-2 border-brand border-t-transparent rounded-full mx-auto" />
       </div>
@@ -180,7 +245,10 @@ export default function PayPage() {
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               (order as any).order_items?.map((item: any) => (
                 <div key={item.id} className="flex justify-between text-sm">
-                  <span className="text-gray-700">{item.product_name_en} <span className="text-gray-400">×{item.quantity}</span></span>
+                  <span className="text-gray-700">
+                    {item.product_name_en}{' '}
+                    <span className="text-gray-400">×{item.quantity}</span>
+                  </span>
                   <span className="font-semibold">{formatCurrency(item.subtotal)}</span>
                 </div>
               ))}
@@ -194,42 +262,100 @@ export default function PayPage() {
             )}
             <div className="flex justify-between font-black text-lg">
               <span>Total</span>
-              <span className="text-brand font-black">{formatCurrency(order.total_amount)}</span>
+              <span className="text-brand">{formatCurrency(order.total_amount)}</span>
             </div>
           </div>
         </div>
 
+        {/* Failed banner */}
         {paymentFailed && (
           <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-2xl px-4 py-3">
             <XCircle size={20} className="text-red-500 shrink-0" />
-            <p className="text-red-700 text-sm font-semibold">Payment did not go through. Please try again.</p>
+            <div>
+              <p className="text-red-700 text-sm font-bold">Payment did not go through</p>
+              <p className="text-red-500 text-xs mt-0.5">Try again or pay at the counter</p>
+            </div>
           </div>
         )}
 
-        {/* Primary CTA */}
-        <button
-          onClick={handlePay}
-          disabled={paying}
-          className="w-full bg-brand hover:bg-brand-dark active:scale-[0.98] text-white font-black text-xl py-5 rounded-2xl shadow-xl transition-all disabled:opacity-70 flex items-center justify-center gap-3"
-        >
-          {paying ? (
-            <><Loader2 size={22} className="animate-spin" /> Opening…</>
-          ) : platform === 'android' ? (
-            <>🚀 Pay {formatCurrency(order.total_amount)} via UPI</>
-          ) : (
-            <>💳 Pay {formatCurrency(order.total_amount)}</>
-          )}
-        </button>
+        {/* ── UPI DIRECT MODE ── */}
+        {paymentMode === 'upi' && (
+          <>
+            <div className="bg-white rounded-2xl p-4 shadow-sm text-center space-y-1">
+              <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Pay via UPI to</p>
+              <p className="text-xl font-black text-brand">{upiId || '…'}</p>
+              <p className="text-sm text-gray-500">NG&apos;s Cafe · Token #{order.token_number}</p>
+            </div>
 
-        <p className="text-center text-xs text-gray-400">
-          {platform === 'android'
-            ? 'Opens GPay / PhonePe / Paytm directly'
-            : platform === 'ios'
-            ? 'UPI • Cards • Net Banking'
-            : 'Secure payment via Razorpay'}
-        </p>
+            {!upiOpened ? (
+              <button
+                onClick={handleUpiOpen}
+                disabled={!upiId}
+                className="w-full bg-brand hover:bg-brand-dark active:scale-[0.98] text-white font-black text-xl py-5 rounded-2xl shadow-xl transition-all disabled:opacity-70 flex items-center justify-center gap-3"
+              >
+                📱 Pay {formatCurrency(order.total_amount)} via UPI
+              </button>
+            ) : (
+              <div className="space-y-3">
+                <div className="bg-blue-50 border border-blue-200 rounded-2xl px-4 py-3 text-center">
+                  <p className="text-blue-700 text-sm font-bold">Complete the payment in your UPI app</p>
+                  <p className="text-blue-500 text-xs mt-1">Then tap the button below to confirm</p>
+                </div>
+                <button
+                  onClick={handleUpiConfirm}
+                  disabled={confirmingUpi}
+                  className="w-full bg-green-600 hover:bg-green-700 active:scale-[0.98] text-white font-black text-lg py-4 rounded-2xl shadow-xl transition-all disabled:opacity-70 flex items-center justify-center gap-2"
+                >
+                  {confirmingUpi ? <><Loader2 size={20} className="animate-spin" /> Confirming…</> : '✅ I have paid'}
+                </button>
+                <button
+                  onClick={handleUpiOpen}
+                  className="w-full bg-white border-2 border-brand/30 text-brand font-semibold py-3 rounded-2xl text-sm transition-all"
+                >
+                  Re-open UPI app
+                </button>
+              </div>
+            )}
 
-        {/* Cash option */}
+            {/* iOS / web fallback instructions */}
+            {(platform === 'ios' || platform === 'web') && !upiOpened && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 text-sm text-yellow-800 space-y-1">
+                <p className="font-bold">If UPI app doesn&apos;t open automatically:</p>
+                <p>Open GPay / PhonePe / Paytm and pay to:</p>
+                <p className="font-black text-base">{upiId}</p>
+                <p>Amount: <span className="font-bold">{formatCurrency(order.total_amount)}</span> · Note: Token #{order.token_number}</p>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ── RAZORPAY MODE ── */}
+        {paymentMode === 'razorpay' && (
+          <>
+            <button
+              onClick={handleRazorpay}
+              disabled={paying}
+              className="w-full bg-brand hover:bg-brand-dark active:scale-[0.98] text-white font-black text-xl py-5 rounded-2xl shadow-xl transition-all disabled:opacity-70 flex items-center justify-center gap-3"
+            >
+              {paying ? (
+                <><Loader2 size={22} className="animate-spin" /> Opening…</>
+              ) : platform === 'android' ? (
+                <>🚀 Pay {formatCurrency(order.total_amount)} via UPI</>
+              ) : (
+                <>💳 Pay {formatCurrency(order.total_amount)}</>
+              )}
+            </button>
+            <p className="text-center text-xs text-gray-400">
+              {platform === 'android'
+                ? 'Opens GPay / PhonePe / Paytm directly'
+                : platform === 'ios'
+                ? 'UPI • Cards • Net Banking'
+                : 'Secure payment via Razorpay'}
+            </p>
+          </>
+        )}
+
+        {/* Cash fallback */}
         <button
           onClick={() => router.push(`/order/${id}?cash=1`)}
           className="w-full bg-white border-2 border-gray-200 hover:border-brand/40 text-gray-600 font-semibold py-3.5 rounded-2xl transition-all flex items-center justify-center gap-2"
