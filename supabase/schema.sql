@@ -245,3 +245,8 @@ create policy "tokens_public_all" on daily_token_counters for all using (true);
 alter publication supabase_realtime add table orders;
 alter publication supabase_realtime add table order_items;
 alter publication supabase_realtime add table payments;
+
+-- Required for filtered realtime subscriptions (filter: id=eq.X)
+alter table orders replica identity full;
+alter table order_items replica identity full;
+alter table payments replica identity full;

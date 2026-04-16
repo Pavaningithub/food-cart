@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { OrderWithItems } from '@/types';
 import { formatCurrency, formatTime, ORDER_STATUS_LABELS, ORDER_STATUS_COLORS } from '@/lib/utils';
@@ -10,12 +10,32 @@ import Link from 'next/link';
 
 const STATUS_STEPS = ['ordered', 'ready', 'delivered'];
 
+function playReadyChime() {
+  try {
+    const ctx = new AudioContext();
+    [1046, 1318, 1568].forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.frequency.value = freq;
+      osc.type = 'sine';
+      gain.gain.setValueAtTime(0, ctx.currentTime + i * 0.18);
+      gain.gain.linearRampToValueAtTime(0.4, ctx.currentTime + i * 0.18 + 0.05);
+      gain.gain.linearRampToValueAtTime(0, ctx.currentTime + i * 0.18 + 0.35);
+      osc.start(ctx.currentTime + i * 0.18);
+      osc.stop(ctx.currentTime + i * 0.18 + 0.35);
+    });
+  } catch { /* ignore */ }
+}
+
 export default function OrderStatusPage() {
   const { id } = useParams<{ id: string }>();
   const searchParams = useSearchParams();
   const isCash = searchParams.get('cash') === '1';
   const [order, setOrder] = useState<OrderWithItems | null>(null);
   const [loading, setLoading] = useState(true);
+  const [connected, setConnected] = useState(false);
+  const prevStatus = useRef<string | null>(null);
 
   const fetchOrder = useCallback(async () => {
     const res = await fetch(`/api/orders/${id}`);
@@ -24,25 +44,49 @@ export default function OrderStatusPage() {
     setLoading(false);
   }, [id]);
 
-  useEffect(() => {
-    fetchOrder();
-  }, [fetchOrder]);
+  useEffect(() => { fetchOrder(); }, [fetchOrder]);
 
-  // Realtime subscription
+  // Realtime subscription with fallback polling
   useEffect(() => {
     const supabase = createClient();
     const channel = supabase
-      .channel(`order-${id}`)
+      .channel(`order-status-${id}`)
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${id}` },
         (payload) => {
+          const newStatus = (payload.new as { status: string }).status;
+          // Play chime + vibrate when order becomes ready
+          if (prevStatus.current && prevStatus.current !== 'ready' && newStatus === 'ready') {
+            playReadyChime();
+            if ('vibrate' in navigator) navigator.vibrate([200, 100, 200]);
+          }
+          prevStatus.current = newStatus;
           setOrder((prev) => prev ? { ...prev, ...payload.new } : null);
         }
       )
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [id]);
+      .subscribe((status) => {
+        setConnected(status === 'SUBSCRIBED');
+      });
+
+    // Fallback: poll every 15s in case websocket drops
+    const poll = setInterval(() => fetchOrder(), 15000);
+
+    return () => {
+      supabase.removeChannel(channel);
+      clearInterval(poll);
+    };
+  }, [id, fetchOrder]);
+
+  // Track status changes from polling too
+  useEffect(() => {
+    if (!order) return;
+    if (prevStatus.current && prevStatus.current !== 'ready' && order.status === 'ready') {
+      playReadyChime();
+      if ('vibrate' in navigator) navigator.vibrate([200, 100, 200]);
+    }
+    prevStatus.current = order.status;
+  }, [order?.status]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) {
     return (
@@ -70,7 +114,7 @@ export default function OrderStatusPage() {
       <div className={`text-white px-6 py-8 text-center transition-all ${isReady ? 'bg-green-500' : 'bg-gradient-to-br from-orange-500 to-orange-600'}`}>
         {isReady && <p className="text-2xl mb-1">🔔</p>}
         <p className="text-sm font-medium opacity-80 mb-1">
-          {isReady ? 'Your order is ready!' : 'Token Number'}
+          {isReady ? 'Your order is ready! 🎉' : 'Token Number'}
         </p>
         <div className="text-8xl font-black tabular-nums">{order.token_number}</div>
         <p className="mt-2 font-bold text-lg opacity-90">
@@ -79,6 +123,11 @@ export default function OrderStatusPage() {
         <p className="text-xs opacity-70 mt-1">
           {order.order_type === 'parcel' ? '📦 Parcel' : '🍽️ Dine In'} · {formatTime(order.created_at)}
         </p>
+        {/* Realtime connection indicator */}
+        <div className="mt-3 flex items-center justify-center gap-1.5">
+          <span className={`w-2 h-2 rounded-full ${connected ? 'bg-green-300 animate-pulse' : 'bg-yellow-300'}`} />
+          <span className="text-xs opacity-60">{connected ? 'Live updates on' : 'Connecting...'}</span>
+        </div>
       </div>
 
       <div className="px-4 pt-5 space-y-4">

@@ -25,7 +25,14 @@ export default function DisplayPage() {
       .channel('display-board')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => fetchOrders())
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    const onVisible = () => { if (document.visibilityState === 'visible') fetchOrders(); };
+    document.addEventListener('visibilitychange', onVisible);
+    const poll = setInterval(() => fetchOrders(), 15000);
+    return () => {
+      supabase.removeChannel(channel);
+      document.removeEventListener('visibilitychange', onVisible);
+      clearInterval(poll);
+    };
   }, [fetchOrders]);
 
   return (

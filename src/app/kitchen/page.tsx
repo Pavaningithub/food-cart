@@ -57,14 +57,21 @@ export default function KitchenPage() {
     const supabase = createClient();
     const channel = supabase
       .channel('kitchen-orders')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
-        fetchOrders(true);
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, () => {
-        fetchOrders(true);
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => fetchOrders(true))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, () => fetchOrders(true))
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+
+    // Re-fetch when tab/screen becomes visible again (phone wake-up)
+    const onVisible = () => { if (document.visibilityState === 'visible') fetchOrders(); };
+    document.addEventListener('visibilitychange', onVisible);
+    // Fallback poll every 20s
+    const poll = setInterval(() => fetchOrders(), 20000);
+
+    return () => {
+      supabase.removeChannel(channel);
+      document.removeEventListener('visibilitychange', onVisible);
+      clearInterval(poll);
+    };
   }, [fetchOrders]);
 
   const updateStatus = async (orderId: string, status: string) => {
