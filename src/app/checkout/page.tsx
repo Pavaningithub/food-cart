@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useCartStore } from '@/store/cart';
 import { useRouter } from 'next/navigation';
 import { formatCurrency } from '@/lib/utils';
-import { Minus, Plus, Trash2, ArrowLeft } from 'lucide-react';
+import { Minus, Plus, Trash2, ArrowLeft, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function CheckoutPage() {
@@ -12,6 +12,7 @@ export default function CheckoutPage() {
   const [parcelCharge, setParcelCharge] = useState(10);
   const [loading, setLoading] = useState(false);
   const [notes, setNotes] = useState('');
+  const navigating = useRef(false);
   const router = useRouter();
 
   // Fetch parcel charge — use localStorage cache (5 min) to avoid slow cold-start on every load
@@ -44,7 +45,7 @@ export default function CheckoutPage() {
   const extra = orderType === 'parcel' ? parcelCharge : 0;
   const total = sub + extra;
 
-  if (items.length === 0) {
+  if (items.length === 0 && !navigating.current) {
     return (
       <div className="max-w-lg mx-auto px-4 py-16 text-center">
         <p className="text-4xl mb-4">🛒</p>
@@ -52,6 +53,15 @@ export default function CheckoutPage() {
         <button onClick={() => router.push('/menu')} className="mt-4 text-brand font-bold">
           ← Back to Menu
         </button>
+      </div>
+    );
+  }
+
+  if (navigating.current) {
+    return (
+      <div className="max-w-lg mx-auto px-4 py-20 text-center">
+        <Loader2 size={36} className="animate-spin text-brand mx-auto mb-3" />
+        <p className="text-gray-500 font-medium">Setting up your order…</p>
       </div>
     );
   }
@@ -68,9 +78,11 @@ export default function CheckoutPage() {
       if (!res.ok) throw new Error(data.error);
 
       if (paymentMethod === 'online') {
+        navigating.current = true;
         router.push(`/pay/${data.order.id}?auto=1`);
         clearCart();
       } else {
+        navigating.current = true;
         router.push(`/order/${data.order.id}?cash=1`);
         clearCart();
       }

@@ -74,30 +74,41 @@ export default function PayPage() {
 
   useEffect(() => { return () => { if (pollRef.current) clearInterval(pollRef.current); }; }, []);
 
-  // ── Poll until paid (used after UPI intent + after modal dismiss) ────────
+  // ── Poll until paid — fast at first, then slower ──────────────────────
   const startPolling = useCallback(() => {
     if (pollRef.current) return;
     setVerifying(true);
+    let ticks = 0;
     pollRef.current = setInterval(async () => {
+      ticks++;
+      // After 20 fast ticks (20s), slow down to every 3s
+      if (ticks === 20) {
+        clearInterval(pollRef.current!);
+        pollRef.current = setInterval(async () => {
+          const data = await fetch(`/api/orders/${id}`).then((r) => r.json());
+          if (data.order?.payment_status === 'paid') {
+            setPaid(true); setVerifying(false);
+            clearInterval(pollRef.current!); pollRef.current = null;
+            setTimeout(() => router.push(`/order/${id}`), 800);
+          } else if (data.order?.payment_status === 'failed') {
+            setPaymentFailed(true); setVerifying(false);
+            clearInterval(pollRef.current!); pollRef.current = null;
+          }
+        }, 3000);
+        // Stop showing spinner after 60s total — let user retry
+        setTimeout(() => { if (pollRef.current) setVerifying(false); }, 40000);
+        return;
+      }
       const data = await fetch(`/api/orders/${id}`).then((r) => r.json());
       if (data.order?.payment_status === 'paid') {
-        setPaid(true);
-        setVerifying(false);
-        clearInterval(pollRef.current!);
-        setTimeout(() => router.push(`/order/${id}`), 1200);
+        setPaid(true); setVerifying(false);
+        clearInterval(pollRef.current!); pollRef.current = null;
+        setTimeout(() => router.push(`/order/${id}`), 800);
       } else if (data.order?.payment_status === 'failed') {
-        setPaymentFailed(true);
-        setVerifying(false);
-        clearInterval(pollRef.current!);
-        pollRef.current = null;
+        setPaymentFailed(true); setVerifying(false);
+        clearInterval(pollRef.current!); pollRef.current = null;
       }
-    }, 2500);
-    // Stop verifying state after 30s if no result (let user retry)
-    setTimeout(() => {
-      if (pollRef.current) {
-        setVerifying(false); // show retry UI, keep polling quietly
-      }
-    }, 30000);
+    }, 1000);
   }, [id, router]);
 
   // ── visibilitychange: when user returns from UPI app → start polling ─────
@@ -172,9 +183,11 @@ export default function PayPage() {
         description: `Token #${order?.token_number}`,
         order_id: data.razorpay_order_id,
         handler: () => {
-          // Payment captured — start polling to confirm via webhook
+          // Razorpay confirmed on client side — go to order page immediately
+          // Webhook will confirm on backend; order page polls for final status
+          setPaid(true);
           setPaying(false);
-          startPolling();
+          setTimeout(() => router.push(`/order/${id}`), 800);
         },
         prefill: { name: '', email: '', contact: '' },
         theme: { color: '#8B1A1A' },
@@ -276,23 +289,24 @@ export default function PayPage() {
           </div>
         </div>
 
-        {/* Verifying state — shown after UPI app returns or modal closes */}
+        {/* Verifying state */}
         {verifying && (
           <div className="bg-blue-50 border border-blue-200 rounded-2xl px-4 py-4 text-center space-y-2">
             <Loader2 size={24} className="animate-spin text-blue-500 mx-auto" />
             <p className="text-blue-700 font-bold text-sm">Verifying your payment…</p>
-            <p className="text-blue-500 text-xs">This usually takes a few seconds</p>
+            <p className="text-blue-500 text-xs">Please wait — this usually takes 5–15 seconds</p>
+            <p className="text-blue-400 text-xs">Do not close or refresh this page</p>
           </div>
         )}
 
         {/* Failed banner */}
         {paymentFailed && !verifying && (
-          <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-2xl px-4 py-3">
-            <XCircle size={20} className="text-red-500 shrink-0" />
-            <div>
-              <p className="text-red-700 text-sm font-bold">Payment did not go through</p>
-              <p className="text-red-500 text-xs mt-0.5">Try again below or pay at the counter</p>
+          <div className="bg-red-50 border border-red-200 rounded-2xl px-4 py-4 space-y-2">
+            <div className="flex items-center gap-2">
+              <XCircle size={20} className="text-red-500 shrink-0" />
+              <p className="text-red-700 font-bold text-sm">Payment did not go through</p>
             </div>
+            <p className="text-red-600 text-xs pl-7">Your money has <span className="font-bold">not</span> been deducted. You can try again or pay at the counter.</p>
           </div>
         )}
 

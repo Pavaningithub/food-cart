@@ -32,6 +32,7 @@ export default function OrderStatusPage() {
   const { id } = useParams<{ id: string }>();
   const searchParams = useSearchParams();
   const isCash = searchParams.get('cash') === '1';
+  const isOnlinePay = searchParams.get('auto') === '1' || (!isCash && searchParams.get('cash') !== '1');
   const [order, setOrder] = useState<OrderWithItems | null>(null);
   const [loading, setLoading] = useState(true);
   const [connected, setConnected] = useState(false);
@@ -131,11 +132,49 @@ export default function OrderStatusPage() {
       </div>
 
       <div className="px-4 pt-5 space-y-4">
-        {/* Cash payment notice */}
+        {/* Payment status banners */}
         {isCash && order.payment_status === 'unpaid' && (
           <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 text-center">
             <p className="font-bold text-yellow-800">💵 Please pay at the counter</p>
             <p className="text-yellow-600 text-sm mt-1">Show this screen to staff</p>
+          </div>
+        )}
+
+        {!isCash && order.payment_status === 'unpaid' && (
+          <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 space-y-3">
+            <div className="text-center">
+              <p className="font-bold text-orange-800">⏳ Payment confirming…</p>
+              <p className="text-orange-600 text-sm mt-1">Your payment is being verified. This page will update automatically.</p>
+            </div>
+            <a
+              href={`/pay/${order.id}`}
+              className="block w-full text-center bg-brand text-white font-bold py-2.5 rounded-xl text-sm"
+            >
+              Complete payment →
+            </a>
+          </div>
+        )}
+
+        {order.payment_status === 'failed' && (
+          <div className="bg-red-50 border border-red-200 rounded-2xl p-4 space-y-3">
+            <div>
+              <p className="font-bold text-red-700">❌ Payment failed</p>
+              <p className="text-red-600 text-sm mt-1">Your money was <span className="font-bold">not</span> deducted. Please try again or pay at the counter.</p>
+            </div>
+            <div className="flex gap-2">
+              <a href={`/pay/${order.id}`} className="flex-1 text-center bg-brand text-white font-bold py-2.5 rounded-xl text-sm">
+                Try Again
+              </a>
+              <a href={`/order/${order.id}?cash=1`} className="flex-1 text-center bg-white border-2 border-gray-200 text-gray-700 font-bold py-2.5 rounded-xl text-sm">
+                Pay at Counter
+              </a>
+            </div>
+          </div>
+        )}
+
+        {order.payment_status === 'paid' && !isCash && (
+          <div className="bg-green-50 border border-green-200 rounded-2xl p-3 text-center">
+            <p className="text-green-700 font-bold text-sm">✅ Payment received — NG&apos;s Cafe</p>
           </div>
         )}
 
