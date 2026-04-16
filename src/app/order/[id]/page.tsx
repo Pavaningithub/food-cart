@@ -7,6 +7,7 @@ import { formatCurrency, formatTime, ORDER_STATUS_LABELS, ORDER_STATUS_COLORS } 
 import { createClient } from '@/lib/supabase/client';
 import QRCode from 'react-qr-code';
 import Link from 'next/link';
+import { updateRecentOrderStatus } from '@/components/RecentOrderBanner';
 
 const STATUS_STEPS = ['ordered', 'ready', 'delivered'];
 
@@ -88,6 +89,11 @@ export default function OrderStatusPage() {
     }
     prevStatus.current = order.status;
   }, [order?.status]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Keep localStorage in sync so RecentOrderBanner reflects latest status
+  useEffect(() => {
+    if (order) updateRecentOrderStatus(order.id, order.status, order.payment_status);
+  }, [order?.status, order?.payment_status]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) {
     return (

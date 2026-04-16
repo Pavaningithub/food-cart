@@ -7,6 +7,7 @@ import ProductCard from '@/components/menu/ProductCard';
 import CartBar from '@/components/menu/CartBar';
 import { CATEGORY_LABELS, CATEGORY_LABELS_KN } from '@/lib/utils';
 import { ShoppingBag } from 'lucide-react';
+import RecentOrderBanner from '@/components/RecentOrderBanner';
 
 const CATEGORIES: ProductCategory[] = ['main', 'snack', 'drink', 'dessert'];
 
@@ -47,6 +48,9 @@ export default function MenuPage() {
           <p className="text-white/70 text-xs font-medium">by NG&apos;s Cafe &nbsp;·&nbsp; ಊಟ ತನ್ನಿಚ್ಛೆ</p>
         </div>
       </div>
+
+      {/* Resume recent order banner */}
+      <RecentOrderBanner />
 
       {/* Order Type Toggle */}
       <div className="bg-white border-b px-4 py-3 sticky top-0 z-40 shadow-sm">

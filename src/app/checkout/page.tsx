@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { formatCurrency } from '@/lib/utils';
 import { Minus, Plus, Trash2, ArrowLeft, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { saveRecentOrder } from '@/components/RecentOrderBanner';
 
 export default function CheckoutPage() {
   const { items, orderType, setOrderType, updateQuantity, removeItem, subtotal, clearCart } = useCartStore();
@@ -76,6 +77,17 @@ export default function CheckoutPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
+
+      // Save to localStorage so customer can resume if they refresh/close
+      saveRecentOrder({
+        id: data.order.id,
+        token_number: data.order.token_number,
+        total_amount: data.order.total_amount,
+        status: data.order.status,
+        payment_status: data.order.payment_status,
+        order_type: orderType,
+        created_at: data.order.created_at,
+      });
 
       if (paymentMethod === 'online') {
         navigating.current = true;
