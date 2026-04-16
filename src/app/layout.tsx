@@ -6,8 +6,8 @@ import { Toaster } from "react-hot-toast";
 const geist = Geist({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "FoodCart - Fresh Rice Bath Daily",
-  description: "Order fresh rice bath, bisi bele bath and more.",
+  title: "ಒಗ್ಗರಣೆ BOWL — by NG's Cafe",
+  description: "ಊಟ ತನ್ನಿಚ್ಛೆ · Fresh Rice Bath & More · NG's Cafe",
 };
 
 export default function RootLayout({
@@ -16,8 +16,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body className={`${geist.className} bg-orange-50 min-h-screen`}>
+    <html lang="kn">
+      <body className={`${geist.className} bg-cream min-h-screen`}>
         {children}
         <Toaster
           position="top-center"

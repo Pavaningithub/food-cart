@@ -38,9 +38,9 @@ export default function DisplayPage() {
   return (
     <div className="min-h-screen bg-gray-950 text-white flex flex-col" style={{ fontFamily: 'system-ui, sans-serif' }}>
       {/* Header */}
-      <div className="bg-orange-600 text-center py-5">
-        <h1 className="text-4xl font-black tracking-wide">🍛 FoodCart — ಫುಡ್ ಕಾರ್ಟ್</h1>
-        <p className="text-orange-200 font-medium mt-1">Order Status Display</p>
+      <div className="bg-brand text-center py-5">
+        <h1 className="text-4xl font-black tracking-wide">ಒಗ್ಗರಣೆ BOWL · by NG&apos;s Cafe</h1>
+        <p className="text-brand-light font-medium mt-1">ಊಟ ತನ್ನಿಚ್ಛೆ · Order Status Display</p>
       </div>
 
       <div className="flex flex-1 gap-0">
@@ -72,9 +72,9 @@ export default function DisplayPage() {
 
         {/* PREPARING section */}
         <div className="flex-1 bg-gray-900">
-          <div className="bg-orange-900 text-center py-4">
+          <div className="bg-brand-dark text-center py-4">
             <h2 className="text-3xl font-black text-white">⏳ BEING PREPARED</h2>
-            <p className="text-orange-200 text-sm">ತಯಾರಾಗುತ್ತಿದೆ</p>
+            <p className="text-brand-light text-sm">ತಯಾರಾಗುತ್ತಿದೆ</p>
           </div>
           <div className="p-6">
             {preparingOrders.length === 0 ? (
@@ -85,7 +85,7 @@ export default function DisplayPage() {
               <div className="grid grid-cols-4 gap-3">
                 {preparingOrders.map((order) => (
                   <div key={order.id} className="bg-gray-800 rounded-xl p-4 text-center">
-                    <div className="text-5xl font-black text-orange-400 tabular-nums">{order.token_number}</div>
+                    <div className="text-5xl font-black text-brand tabular-nums">{order.token_number}</div>
                     <p className="text-gray-500 text-xs mt-1">
                       {order.order_type === 'parcel' ? '📦' : '🍽️'}
                     </p>
@@ -101,7 +101,7 @@ export default function DisplayPage() {
       <div className="bg-gray-900 border-t border-gray-800 py-3 text-center">
         <p className="text-gray-500 text-sm">
           🕐 {new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })} &nbsp;|&nbsp;
-          Thank you for visiting FoodCart! Come again 😊
+          NG&apos;s Cafe ಗೆ ಸ್ವಾಗತ! ಮತ್ತೆ ಬನ್ನಿ 😊
         </p>
       </div>
     </div>

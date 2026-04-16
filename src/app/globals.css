@@ -10,13 +10,13 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  /* ── ಒಗ್ಗರಣೆ BOWL brand palette ── */
+  --color-brand:        #8B1A1A;
+  --color-brand-dark:   #6B1212;
+  --color-brand-light:  #F5E8E8;
+  --color-cream:        #FFF8EC;
+  --color-cream-dark:   #F5EDD8;
 }
 
 body {

@@ -91,7 +91,7 @@ export default function OrderStatusPage() {
   if (loading) {
     return (
       <div className="max-w-lg mx-auto px-4 py-20 text-center">
-        <div className="animate-spin w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full mx-auto" />
+        <div className="animate-spin w-8 h-8 border-4 border-brand border-t-transparent rounded-full mx-auto" />
       </div>
     );
   }
@@ -111,7 +111,7 @@ export default function OrderStatusPage() {
   return (
     <div className="max-w-lg mx-auto pb-8">
       {/* Hero token */}
-      <div className={`text-white px-6 py-8 text-center transition-all ${isReady ? 'bg-green-500' : 'bg-gradient-to-br from-orange-500 to-orange-600'}`}>
+      <div className={`text-white px-6 py-8 text-center transition-all ${isReady ? 'bg-green-600' : 'bg-brand'}`}>
         {isReady && <p className="text-2xl mb-1">🔔</p>}
         <p className="text-sm font-medium opacity-80 mb-1">
           {isReady ? 'Your order is ready! 🎉' : 'Token Number'}
@@ -155,11 +155,11 @@ export default function OrderStatusPage() {
               return (
                 <div key={step} className="flex flex-col items-center flex-1">
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold transition-all ${
-                    done ? 'bg-green-500 text-white' : active ? 'bg-orange-500 text-white ring-4 ring-orange-200' : 'bg-gray-100 text-gray-400'
+                    done ? 'bg-green-500 text-white' : active ? 'bg-brand text-white ring-4 ring-brand/20' : 'bg-gray-100 text-gray-400'
                   }`}>
                     {icons[step]}
                   </div>
-                  <p className={`text-xs mt-1 font-semibold ${active ? 'text-orange-600' : done ? 'text-green-600' : 'text-gray-400'}`}>
+                  <p className={`text-xs mt-1 font-semibold ${active ? 'text-brand' : done ? 'text-green-600' : 'text-gray-400'}`}>
                     {ORDER_STATUS_LABELS[step]}
                   </p>
                   {i < STATUS_STEPS.length - 1 && (
@@ -184,7 +184,7 @@ export default function OrderStatusPage() {
               <div key={item.id} className="flex justify-between items-center">
                 <div>
                   <p className="font-semibold text-gray-800 text-sm">{item.product_name_en}</p>
-                  <p className="text-orange-500 text-xs">{item.product_name_kn}</p>
+                  <p className="text-brand text-xs">{item.product_name_kn}</p>
                 </div>
                 <div className="text-right">
                   <p className="font-bold text-sm">x{item.quantity}</p>
@@ -195,7 +195,7 @@ export default function OrderStatusPage() {
           </div>
           <div className="border-t pt-3 mt-3 flex justify-between font-black">
             <span>Total</span>
-            <span className="text-orange-600">{formatCurrency(order.total_amount)}</span>
+            <span className="text-brand font-black">{formatCurrency(order.total_amount)}</span>
           </div>
         </div>
 
@@ -209,7 +209,7 @@ export default function OrderStatusPage() {
 
         <Link
           href="/menu"
-          className="block text-center text-orange-500 font-bold py-3"
+          className="block text-center text-brand font-bold py-3"
         >
           + Order More
         </Link>

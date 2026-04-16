@@ -18,7 +18,7 @@ export default function CartBar() {
     <div className="fixed bottom-0 left-0 right-0 z-50 p-3 bg-transparent pointer-events-none">
       <button
         onClick={() => router.push('/checkout')}
-        className="w-full max-w-lg mx-auto flex items-center justify-between bg-orange-500 hover:bg-orange-600 active:scale-98 text-white rounded-2xl px-5 py-4 shadow-2xl pointer-events-auto transition-all"
+        className="w-full max-w-lg mx-auto flex items-center justify-between bg-brand hover:bg-brand-dark active:scale-98 text-white rounded-2xl px-5 py-4 shadow-2xl pointer-events-auto transition-all"
       >
         <div className="flex items-center gap-3">
           <div className="bg-white/20 rounded-xl p-1.5">

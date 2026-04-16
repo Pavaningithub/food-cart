@@ -96,7 +96,7 @@ export default function PayPage() {
         key: data.key_id,
         amount: data.amount,
         currency: data.currency,
-        name: 'FoodCart',
+        name: "NG's Cafe — ಒಗ್ಗರಣೆ BOWL",
         description: `Token #${order?.token_number}`,
         order_id: data.razorpay_order_id,
         handler: () => {
@@ -133,7 +133,7 @@ export default function PayPage() {
   if (loading) {
     return (
       <div className="max-w-lg mx-auto px-4 py-20 text-center">
-        <div className="animate-spin w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full mx-auto" />
+        <div className="animate-spin w-8 h-8 border-4 border-brand border-t-transparent rounded-full mx-auto" />
       </div>
     );
   }
@@ -151,9 +151,9 @@ export default function PayPage() {
       <div className="max-w-lg mx-auto px-4 py-20 text-center">
         <CheckCircle size={72} className="mx-auto text-green-500 mb-4" />
         <h2 className="text-3xl font-black text-green-600 mb-2">Payment Done! 🎉</h2>
-        <p className="text-gray-500 mb-2">Token <span className="font-black text-orange-500 text-xl">#{order.token_number}</span></p>
+        <p className="text-gray-500 mb-2">Token <span className="font-black text-brand text-xl">#{order.token_number}</span></p>
         <p className="text-gray-400 text-sm">Taking you to your order…</p>
-        <div className="mt-6 animate-spin w-6 h-6 border-2 border-orange-400 border-t-transparent rounded-full mx-auto" />
+        <div className="mt-6 animate-spin w-6 h-6 border-2 border-brand border-t-transparent rounded-full mx-auto" />
       </div>
     );
   }
@@ -163,15 +163,15 @@ export default function PayPage() {
   return (
     <div className="max-w-lg mx-auto min-h-screen flex flex-col">
       {/* Token hero */}
-      <div className="bg-gradient-to-br from-orange-500 to-orange-600 text-white px-6 pt-10 pb-8 text-center">
-        <p className="text-orange-200 text-sm font-semibold tracking-wide uppercase mb-1">Your Token</p>
+      <div className="bg-brand text-white px-6 pt-10 pb-8 text-center">
+        <p className="text-brand-light text-sm font-semibold tracking-wide uppercase mb-1">Your Token</p>
         <div className="text-8xl font-black tabular-nums leading-none">{order.token_number}</div>
-        <p className="text-orange-100 mt-3 font-medium text-base">
+        <p className="text-cream mt-3 font-medium text-base">
           {order.order_type === 'parcel' ? '📦 Parcel Order' : '🍽️ Dine In'}
         </p>
       </div>
 
-      <div className="flex-1 px-4 pt-6 pb-10 space-y-4 bg-orange-50">
+      <div className="flex-1 px-4 pt-6 pb-10 space-y-4 bg-cream">
         {/* Bill */}
         <div className="bg-white rounded-2xl p-5 shadow-sm">
           <h3 className="font-bold text-gray-500 text-xs uppercase tracking-wide mb-3">Your Order</h3>
@@ -194,7 +194,7 @@ export default function PayPage() {
             )}
             <div className="flex justify-between font-black text-lg">
               <span>Total</span>
-              <span className="text-orange-600">{formatCurrency(order.total_amount)}</span>
+              <span className="text-brand font-black">{formatCurrency(order.total_amount)}</span>
             </div>
           </div>
         </div>
@@ -210,7 +210,7 @@ export default function PayPage() {
         <button
           onClick={handlePay}
           disabled={paying}
-          className="w-full bg-orange-500 hover:bg-orange-600 active:scale-[0.98] text-white font-black text-xl py-5 rounded-2xl shadow-xl transition-all disabled:opacity-70 flex items-center justify-center gap-3"
+          className="w-full bg-brand hover:bg-brand-dark active:scale-[0.98] text-white font-black text-xl py-5 rounded-2xl shadow-xl transition-all disabled:opacity-70 flex items-center justify-center gap-3"
         >
           {paying ? (
             <><Loader2 size={22} className="animate-spin" /> Opening…</>
@@ -232,7 +232,7 @@ export default function PayPage() {
         {/* Cash option */}
         <button
           onClick={() => router.push(`/order/${id}?cash=1`)}
-          className="w-full bg-white border-2 border-gray-200 hover:border-orange-300 text-gray-600 font-semibold py-3.5 rounded-2xl transition-all flex items-center justify-center gap-2"
+          className="w-full bg-white border-2 border-gray-200 hover:border-brand/40 text-gray-600 font-semibold py-3.5 rounded-2xl transition-all flex items-center justify-center gap-2"
         >
           <ShoppingBag size={18} />
           Pay at counter instead (Cash)

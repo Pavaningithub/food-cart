@@ -36,7 +36,7 @@ export default function CheckoutPage() {
       <div className="max-w-lg mx-auto px-4 py-16 text-center">
         <p className="text-4xl mb-4">🛒</p>
         <p className="text-gray-500 font-medium">Your cart is empty</p>
-        <button onClick={() => router.push('/menu')} className="mt-4 text-orange-500 font-bold">
+        <button onClick={() => router.push('/menu')} className="mt-4 text-brand font-bold">
           ← Back to Menu
         </button>
       </div>
@@ -86,7 +86,7 @@ export default function CheckoutPage() {
             <button
               onClick={() => setOrderType('dine_in')}
               className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all ${
-                orderType === 'dine_in' ? 'bg-orange-500 text-white shadow' : 'bg-gray-100 text-gray-600'
+                orderType === 'dine_in' ? 'bg-brand text-white shadow' : 'bg-gray-100 text-gray-600'
               }`}
             >
               🍽️ Dine In
@@ -94,7 +94,7 @@ export default function CheckoutPage() {
             <button
               onClick={() => setOrderType('parcel')}
               className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all ${
-                orderType === 'parcel' ? 'bg-orange-500 text-white shadow' : 'bg-gray-100 text-gray-600'
+                orderType === 'parcel' ? 'bg-brand text-white shadow' : 'bg-gray-100 text-gray-600'
               }`}
             >
               📦 Parcel <span className="opacity-75 text-xs">(+₹{parcelCharge})</span>
@@ -109,20 +109,20 @@ export default function CheckoutPage() {
             <div key={item.product.id} className="flex items-center gap-3">
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-gray-900 text-sm truncate">{item.product.name_en}</p>
-                <p className="text-orange-500 text-xs">{item.product.name_kn}</p>
+                <p className="text-brand text-xs">{item.product.name_kn}</p>
                 <p className="text-gray-500 text-sm">₹{item.product.price} each</p>
               </div>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
-                  className="bg-orange-100 text-orange-600 w-7 h-7 rounded-full flex items-center justify-center"
+                  className="bg-brand-light text-brand w-7 h-7 rounded-full flex items-center justify-center"
                 >
                   <Minus size={14} />
                 </button>
                 <span className="font-bold w-5 text-center text-sm">{item.quantity}</span>
                 <button
                   onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
-                  className="bg-orange-500 text-white w-7 h-7 rounded-full flex items-center justify-center"
+                  className="bg-brand text-white w-7 h-7 rounded-full flex items-center justify-center"
                 >
                   <Plus size={14} />
                 </button>
@@ -147,7 +147,7 @@ export default function CheckoutPage() {
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="Any special requests? (optional)"
-            className="w-full border border-gray-200 rounded-xl p-3 text-sm resize-none focus:outline-none focus:border-orange-400"
+            className="w-full border border-gray-200 rounded-xl p-3 text-sm resize-none focus:outline-none focus:border-brand"
             rows={2}
           />
         </div>
@@ -168,7 +168,7 @@ export default function CheckoutPage() {
             )}
             <div className="flex justify-between font-black text-gray-900 text-base border-t pt-2 mt-2">
               <span>Total</span>
-              <span className="text-orange-600">{formatCurrency(total)}</span>
+              <span className="text-brand font-black">{formatCurrency(total)}</span>
             </div>
           </div>
         </div>
@@ -178,14 +178,14 @@ export default function CheckoutPage() {
           <button
             onClick={() => handlePlaceOrder('online')}
             disabled={loading}
-            className="w-full bg-orange-500 hover:bg-orange-600 text-white font-black text-lg py-4 rounded-2xl shadow-lg transition-all active:scale-98 disabled:opacity-60"
+            className="w-full bg-brand hover:bg-brand-dark text-white font-black text-lg py-4 rounded-2xl shadow-lg transition-all active:scale-98 disabled:opacity-60"
           >
             {loading ? '...' : `💳 Pay Online — ${formatCurrency(total)}`}
           </button>
           <button
             onClick={() => handlePlaceOrder('cash')}
             disabled={loading}
-            className="w-full bg-white border-2 border-gray-200 hover:border-orange-300 text-gray-700 font-bold text-base py-3.5 rounded-2xl transition-all active:scale-98 disabled:opacity-60"
+            className="w-full bg-white border-2 border-gray-200 hover:border-brand/40 text-gray-700 font-bold text-base py-3.5 rounded-2xl transition-all active:scale-98 disabled:opacity-60"
           >
             💵 Pay at Counter (Cash)
           </button>

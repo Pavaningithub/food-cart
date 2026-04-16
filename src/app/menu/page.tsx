@@ -6,7 +6,7 @@ import { useCartStore } from '@/store/cart';
 import ProductCard from '@/components/menu/ProductCard';
 import CartBar from '@/components/menu/CartBar';
 import { CATEGORY_LABELS, CATEGORY_LABELS_KN } from '@/lib/utils';
-import { ShoppingBag, UtensilsCrossed } from 'lucide-react';
+import { ShoppingBag } from 'lucide-react';
 
 const CATEGORIES: ProductCategory[] = ['main', 'snack', 'drink', 'dessert'];
 
@@ -41,13 +41,10 @@ export default function MenuPage() {
   return (
     <div className="max-w-lg mx-auto pb-28">
       {/* Header */}
-      <div className="bg-gradient-to-br from-orange-500 to-orange-600 text-white px-4 pt-8 pb-6">
-        <div className="flex items-center gap-3 mb-1">
-          <UtensilsCrossed size={28} />
-          <div>
-            <h1 className="text-2xl font-black tracking-tight">FoodCart</h1>
-            <p className="text-orange-100 text-sm font-medium">ಫ್ರೆಶ್ ರೈಸ್ ಬಾತ್ ಡೈಲಿ</p>
-          </div>
+      <div className="bg-brand text-white px-4 pt-6 pb-5">
+        <div className="mb-0.5">
+          <h1 className="text-3xl font-black tracking-tight leading-tight">ಒಗ್ಗರಣೆ <span className="font-black">BOWL</span></h1>
+          <p className="text-white/70 text-xs font-medium">by NG&apos;s Cafe &nbsp;·&nbsp; ಊಟ ತನ್ನಿಚ್ಛೆ</p>
         </div>
       </div>
 
@@ -58,7 +55,7 @@ export default function MenuPage() {
             onClick={() => setOrderType('dine_in')}
             className={`flex-1 py-2.5 rounded-xl font-bold text-sm transition-all ${
               orderType === 'dine_in'
-                ? 'bg-orange-500 text-white shadow'
+                ? 'bg-brand text-white shadow'
                 : 'bg-gray-100 text-gray-600'
             }`}
           >
@@ -68,7 +65,7 @@ export default function MenuPage() {
             onClick={() => setOrderType('parcel')}
             className={`flex-1 py-2.5 rounded-xl font-bold text-sm transition-all ${
               orderType === 'parcel'
-                ? 'bg-orange-500 text-white shadow'
+                ? 'bg-brand text-white shadow'
                 : 'bg-gray-100 text-gray-600'
             }`}
           >
@@ -82,7 +79,7 @@ export default function MenuPage() {
             onClick={() => setActiveCategory('all')}
             className={`px-3 py-1.5 rounded-lg text-sm font-semibold whitespace-nowrap transition-all ${
               activeCategory === 'all'
-                ? 'bg-orange-500 text-white'
+                ? 'bg-brand text-white'
                 : 'bg-gray-100 text-gray-600'
             }`}
           >
@@ -94,7 +91,7 @@ export default function MenuPage() {
               onClick={() => setActiveCategory(cat)}
               className={`px-3 py-1.5 rounded-lg text-sm font-semibold whitespace-nowrap transition-all ${
                 activeCategory === cat
-                  ? 'bg-orange-500 text-white'
+                  ? 'bg-brand text-white'
                   : 'bg-gray-100 text-gray-600'
               }`}
             >
@@ -127,7 +124,7 @@ export default function MenuPage() {
                   <div key={cat} className="mb-6">
                     <div className="flex items-center gap-2 mb-3">
                       <h2 className="font-black text-gray-800 text-base">{CATEGORY_LABELS[cat]}</h2>
-                      <span className="text-orange-500 text-sm font-medium">{CATEGORY_LABELS_KN[cat]}</span>
+                      <span className="text-brand text-sm font-medium">{CATEGORY_LABELS_KN[cat]}</span>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       {catItems.map((product) => (
