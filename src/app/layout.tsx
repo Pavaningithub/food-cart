@@ -8,6 +8,9 @@ const geist = Geist({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "ಒಗ್ಗರಣೆ BOWL — by NG's Cafe",
   description: "ಊಟ ತನ್ನಿಚ್ಛೆ · Fresh Rice Bath & More · NG's Cafe",
+  other: {
+    'google': 'notranslate',
+  },
 };
 
 export default function RootLayout({
@@ -16,7 +19,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="kn">
+    <html lang="kn" translate="no">
       <body className={`${geist.className} bg-cream min-h-screen`}>
         {children}
         <Toaster
