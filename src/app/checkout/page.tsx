@@ -106,126 +106,132 @@ export default function CheckoutPage() {
   };
 
   return (
-    <div className="max-w-lg mx-auto pb-8">
+    <div className="max-w-lg mx-auto pb-10" style={{ background: '#FFF8EC', minHeight: '100vh' }}>
       {/* Header */}
-      <div className="bg-white border-b px-4 py-4 flex items-center gap-3">
-        <button onClick={() => router.back()} className="text-gray-600">
+      <div
+        className="px-4 pt-8 pb-5 flex items-center gap-3"
+        style={{ background: 'linear-gradient(135deg, #6B1212 0%, #8B1A1A 100%)' }}
+      >
+        <button onClick={() => router.back()} className="text-white/80 hover:text-white transition-colors">
           <ArrowLeft size={22} />
         </button>
-        <h1 className="text-xl font-black">Your Order</h1>
+        <div>
+          <h1 className="text-xl font-black text-white leading-tight">Your Order</h1>
+          <p className="text-white/55 text-xs">{items.length} item{items.length !== 1 ? 's' : ''} · Review before paying</p>
+        </div>
       </div>
 
-      <div className="px-4 pt-4 space-y-4">
+      <div className="px-4 pt-4 space-y-3">
         {/* Order Type */}
         <div className="bg-white rounded-2xl p-4 shadow-sm">
-          <p className="font-bold text-gray-700 mb-3">Order Type</p>
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Order Type</p>
           <div className="flex gap-2">
             <button
               onClick={() => setOrderType('dine_in')}
-              className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all ${
-                orderType === 'dine_in' ? 'bg-brand text-white shadow' : 'bg-gray-100 text-gray-600'
+              className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-1.5 ${
+                orderType === 'dine_in' ? 'bg-brand text-white shadow-md' : 'bg-gray-100 text-gray-600'
               }`}
             >
               🍽️ Dine In
             </button>
             <button
               onClick={() => setOrderType('parcel')}
-              className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all ${
-                orderType === 'parcel' ? 'bg-brand text-white shadow' : 'bg-gray-100 text-gray-600'
+              className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-1.5 ${
+                orderType === 'parcel' ? 'bg-brand text-white shadow-md' : 'bg-gray-100 text-gray-600'
               }`}
             >
-              📦 Parcel <span className="opacity-75 text-xs">(+₹{parcelCharge})</span>
+              📦 Parcel <span className="opacity-70 font-normal text-xs">(+₹{parcelCharge})</span>
             </button>
           </div>
         </div>
 
         {/* Items */}
-        <div className="bg-white rounded-2xl p-4 shadow-sm space-y-4">
-          <p className="font-bold text-gray-700">Items</p>
-          {items.map((item) => (
-            <div key={item.product.id} className="flex items-center gap-3">
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-gray-900 text-sm truncate">{item.product.name_en}</p>
-                <p className="text-brand text-xs">{item.product.name_kn}</p>
-                <p className="text-gray-500 text-sm">₹{item.product.price} each</p>
+        <div className="bg-white rounded-2xl p-4 shadow-sm">
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Items</p>
+          <div className="space-y-3">
+            {items.map((item) => (
+              <div key={item.product.id} className="flex items-center gap-3">
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-gray-900 text-sm truncate">{item.product.name_en}</p>
+                  <p className="text-brand/70 text-xs font-medium">{item.product.name_kn}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
+                    className="bg-brand-light text-brand w-7 h-7 rounded-full flex items-center justify-center active:scale-95 transition-all"
+                  >
+                    <Minus size={13} />
+                  </button>
+                  <span className="font-black w-5 text-center text-sm">{item.quantity}</span>
+                  <button
+                    onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
+                    className="bg-brand text-white w-7 h-7 rounded-full flex items-center justify-center active:scale-95 transition-all"
+                  >
+                    <Plus size={13} />
+                  </button>
+                  <button onClick={() => removeItem(item.product.id)} className="text-red-400 ml-1 active:scale-95 transition-all">
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+                <span className="font-bold text-sm w-14 text-right text-gray-900">
+                  {formatCurrency(item.product.price * item.quantity)}
+                </span>
               </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
-                  className="bg-brand-light text-brand w-7 h-7 rounded-full flex items-center justify-center"
-                >
-                  <Minus size={14} />
-                </button>
-                <span className="font-bold w-5 text-center text-sm">{item.quantity}</span>
-                <button
-                  onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
-                  className="bg-brand text-white w-7 h-7 rounded-full flex items-center justify-center"
-                >
-                  <Plus size={14} />
-                </button>
-                <button
-                  onClick={() => removeItem(item.product.id)}
-                  className="text-red-400 ml-1"
-                >
-                  <Trash2 size={15} />
-                </button>
-              </div>
-              <span className="font-bold text-sm w-16 text-right">
-                {formatCurrency(item.product.price * item.quantity)}
-              </span>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
 
         {/* Notes */}
         <div className="bg-white rounded-2xl p-4 shadow-sm">
-          <p className="font-bold text-gray-700 mb-2">Special Instructions</p>
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Special Instructions</p>
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            placeholder="Any special requests? (optional)"
-            className="w-full border border-gray-200 rounded-xl p-3 text-sm resize-none focus:outline-none focus:border-brand"
+            placeholder="Allergies, spice level, extras… (optional)"
+            className="w-full border border-gray-200 rounded-xl p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand transition-all"
             rows={2}
           />
         </div>
 
         {/* Bill Summary */}
         <div className="bg-white rounded-2xl p-4 shadow-sm">
-          <p className="font-bold text-gray-700 mb-3">Bill Summary</p>
-          <div className="space-y-2 text-sm">
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Bill Summary</p>
+          <div className="space-y-2.5 text-sm">
             <div className="flex justify-between text-gray-600">
               <span>Subtotal</span>
-              <span>{formatCurrency(sub)}</span>
+              <span className="font-semibold">{formatCurrency(sub)}</span>
             </div>
             {orderType === 'parcel' && (
               <div className="flex justify-between text-gray-600">
                 <span>Parcel Charge</span>
-                <span>{formatCurrency(parcelCharge)}</span>
+                <span className="font-semibold">{formatCurrency(parcelCharge)}</span>
               </div>
             )}
-            <div className="flex justify-between font-black text-gray-900 text-base border-t pt-2 mt-2">
-              <span>Total</span>
-              <span className="text-brand font-black">{formatCurrency(total)}</span>
+            <div className="h-px bg-gray-100 my-1" />
+            <div className="flex justify-between items-center">
+              <span className="font-black text-gray-900 text-base">Total</span>
+              <span className="font-black text-brand text-xl">{formatCurrency(total)}</span>
             </div>
           </div>
         </div>
 
-        {/* Payment Buttons */}
-        <div className="space-y-3 pt-2">
+        {/* CTA */}
+        <div className="pt-1 pb-4">
           <button
             onClick={() => handlePlaceOrder('online')}
             disabled={loading}
-            className="w-full bg-brand hover:bg-brand-dark text-white font-black text-lg py-4 rounded-2xl shadow-lg transition-all active:scale-98 disabled:opacity-60"
+            className="w-full text-white font-black text-lg py-4 rounded-2xl transition-all active:scale-[0.98] disabled:opacity-60 shadow-lg"
+            style={{ background: loading ? '#aaa' : 'linear-gradient(135deg, #8B1A1A 0%, #C0392B 100%)', boxShadow: '0 6px 24px rgba(139,26,26,0.35)' }}
           >
-            {loading ? '...' : `💳 Pay Online — ${formatCurrency(total)}`}
+            {loading ? (
+              <span className="flex items-center justify-center gap-2">
+                <Loader2 size={20} className="animate-spin" /> Placing order…
+              </span>
+            ) : (
+              `💳 Pay ${formatCurrency(total)}`
+            )}
           </button>
-          <button
-            onClick={() => handlePlaceOrder('cash')}
-            disabled={loading}
-            className="w-full bg-white border-2 border-gray-200 hover:border-brand/40 text-gray-700 font-bold text-base py-3.5 rounded-2xl transition-all active:scale-98 disabled:opacity-60"
-          >
-            💵 Pay at Counter (Cash)
-          </button>
+          <p className="text-center text-gray-400 text-xs mt-2.5">Secured by Razorpay · UPI · Cards · Wallets</p>
         </div>
       </div>
     </div>
