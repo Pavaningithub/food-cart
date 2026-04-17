@@ -83,7 +83,7 @@ function ChangePinSection() {
 
 // ── Payment Mode Component ────────────────────────────────────────────────
 function PaymentModeSection() {
-  const [mode, setMode] = useState<'upi' | 'razorpay'>('upi');
+  const [mode, setMode] = useState<'upi' | 'razorpay'>('razorpay');
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
