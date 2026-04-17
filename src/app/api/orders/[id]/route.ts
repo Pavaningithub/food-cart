@@ -48,7 +48,7 @@ export async function PATCH(
         .eq('key', 'admin_pin')
         .single();
 
-      const adminPin = process.env.ADMIN_PIN ?? pinSetting?.value ?? '1234';
+      const adminPin = pinSetting?.value ?? process.env.ADMIN_PIN ?? '1234';
       if (pin !== adminPin) {
         return NextResponse.json({ error: 'Invalid PIN' }, { status: 403 });
       }

@@ -42,9 +42,10 @@ export async function POST(req: NextRequest) {
     }
 
     const { pin } = await req.json();
-    if (!pin || typeof pin !== 'string' || !/^\d{4}$/.test(pin)) {
+    if (!pin || typeof pin !== 'string' || !/^\d{4}$/.test(pin.trim())) {
       return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
     }
+    const trimmedPin = pin.trim();
 
     const supabase = createServiceClient();
     const { data: pinSetting } = await supabase
@@ -53,9 +54,11 @@ export async function POST(req: NextRequest) {
       .eq('key', 'admin_pin')
       .single();
 
-    const adminPin = process.env.ADMIN_PIN ?? pinSetting?.value ?? '1234';
+    // DB is the source of truth; env var is fallback only if DB row is missing
+    const adminPin = (pinSetting?.value ?? process.env.ADMIN_PIN ?? '1234').trim();
+    console.log(`Auth attempt — DB pin exists: ${!!pinSetting}, env pin exists: ${!!process.env.ADMIN_PIN}`);
 
-    if (pin !== adminPin) {
+    if (trimmedPin !== adminPin) {
       recordFailure(ip);
       return NextResponse.json({ error: 'Invalid PIN' }, { status: 403 });
     }
