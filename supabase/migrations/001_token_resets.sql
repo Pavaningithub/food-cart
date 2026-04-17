@@ -5,7 +5,7 @@
 -- ============================================================
 
 create table if not exists token_resets (
-  id            uuid         primary key default uuid_generate_v4(),
+  id            uuid         primary key default gen_random_uuid(),
   reset_at      timestamptz  not null default now(),
   reset_date    date         not null default current_date,
   tokens_used   integer      not null default 0,   -- last_token value before reset

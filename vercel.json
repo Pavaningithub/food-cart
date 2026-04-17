@@ -4,6 +4,12 @@
   "buildCommand": "npm run build",
   "devCommand": "npm run dev",
   "installCommand": "npm install",
+  "git": {
+    "deploymentEnabled": {
+      "main": true,
+      "staging": true
+    }
+  },
   "headers": [
     {
       "source": "/api/webhook/razorpay",
