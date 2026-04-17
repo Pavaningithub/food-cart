@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
     const supabase = createServiceClient();
 
     // Allow kitchen bypass key (no PIN needed on staff kitchen display)
-    const kitchenKey = process.env.KITCHEN_KEY;
+    const kitchenKey = process.env.KITCHEN_KEY ?? process.env.NEXT_PUBLIC_KITCHEN_KEY;
     const isKitchenBypass = kitchenKey && pin === kitchenKey;
 
     if (!isKitchenBypass) {
@@ -39,14 +39,14 @@ export async function POST(req: NextRequest) {
 
     if (error) throw error;
 
-    // Create cash payment record
-    await supabase.from('payments').insert({
+    // Create or update cash payment record (upsert handles pre-existing failed payment rows)
+    await supabase.from('payments').upsert({
       order_id,
       amount: data.total_amount,
       currency: 'INR',
       method: 'cash',
       status: 'captured',
-    });
+    }, { onConflict: 'order_id' });
 
     return NextResponse.json({ order: data });
   } catch (error) {
