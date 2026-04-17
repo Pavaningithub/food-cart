@@ -34,6 +34,8 @@ export default function PayPage() {
   const [verifying, setVerifying] = useState(false); // polling after UPI app returns
   const [paid, setPaid] = useState(false);
   const [paymentFailed, setPaymentFailed] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
+  const [txnId, setTxnId] = useState<string | null>(null);
   // 'upi' = UPI-only via Razorpay | 'razorpay' = full methods
   const [paymentMode, setPaymentMode] = useState<'razorpay' | 'upi'>('razorpay');
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -128,6 +130,7 @@ export default function PayPage() {
     if (paying) return;
     setPaying(true);
     setPaymentFailed(false);
+    setDismissed(false);
     const platform = getPlatform();
 
     try {
@@ -195,9 +198,11 @@ export default function PayPage() {
               }),
             });
           } catch { /* webhook will catch it as fallback */ }
+          setTxnId(response.razorpay_payment_id);
+          setDismissed(false);
           setPaid(true);
           setPaying(false);
-          setTimeout(() => router.push(`/order/${id}`), 800);
+          setTimeout(() => router.push(`/order/${id}`), 2000);
         },
         prefill: { name: '', email: '', contact: '' },
         theme: { color: '#8B1A1A' },
@@ -205,9 +210,9 @@ export default function PayPage() {
         modal: {
           ondismiss: () => {
             setPaying(false);
-            // Don't show verifying spinner — user explicitly closed the modal.
-            // Webhook will update DB if they somehow completed inside; order page
-            // has its own realtime subscription to catch that.
+            setDismissed(true);
+            // Don't poll — user explicitly closed. Order page realtime covers
+            // the rare case they completed inside before closing.
           },
           escape: true,
         },
@@ -247,10 +252,15 @@ export default function PayPage() {
     return (
       <div className="max-w-lg mx-auto px-4 py-20 text-center">
         <CheckCircle size={72} className="mx-auto text-green-500 mb-4" />
-        <h2 className="text-3xl font-black text-green-600 mb-2">Payment Done! 🎉</h2>
+        <h2 className="text-3xl font-black text-green-600 mb-2">Payment Confirmed! 🎉</h2>
         <p className="text-gray-500 mb-2">
           Token <span className="font-black text-brand text-xl">#{order.token_number}</span>
         </p>
+        {txnId && (
+          <p className="text-xs text-gray-400 font-mono bg-gray-100 rounded-lg px-3 py-2 inline-block mb-3">
+            Txn ID: {txnId}
+          </p>
+        )}
         <p className="text-gray-400 text-sm">Taking you to your order…</p>
         <div className="mt-6 animate-spin w-6 h-6 border-2 border-brand border-t-transparent rounded-full mx-auto" />
       </div>
@@ -315,6 +325,15 @@ export default function PayPage() {
             <p className="text-blue-700 font-bold text-sm">Confirming your payment…</p>
             <p className="text-blue-500 text-xs">Please wait — usually done in a moment</p>
             <p className="text-blue-400 text-xs">Do not close or refresh this page</p>
+          </div>
+        )}
+
+        {/* Dismissed banner */}
+        {dismissed && !paymentFailed && !verifying && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-2xl px-4 py-4 space-y-1">
+            <p className="text-yellow-800 font-bold text-sm">⚠️ Payment window closed</p>
+            <p className="text-yellow-700 text-xs">You closed without completing payment. Your order is saved — tap the button below to try again.</p>
+            <p className="text-yellow-500 text-xs">No money has been deducted.</p>
           </div>
         )}
 

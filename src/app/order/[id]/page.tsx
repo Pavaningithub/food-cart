@@ -194,8 +194,15 @@ export default function OrderStatusPage() {
         )}
 
         {order.payment_status === 'paid' && !isCash && (
-          <div className="bg-green-50 border border-green-200 rounded-2xl p-3 text-center">
+          <div className="bg-green-50 border border-green-200 rounded-2xl p-3 text-center space-y-1">
             <p className="text-green-700 font-bold text-sm">✅ Payment received — NG&apos;s Cafe</p>
+            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+            {(order as any).payments?.razorpay_payment_id && (
+              <p className="text-xs text-green-600 font-mono">
+                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                Txn: {(order as any).payments.razorpay_payment_id}
+              </p>
+            )}
           </div>
         )}
 
