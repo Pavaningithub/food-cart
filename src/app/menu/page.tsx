@@ -18,10 +18,29 @@ export default function MenuPage() {
   const { items, addItem, removeItem, orderType, setOrderType } = useCartStore();
 
   const fetchProducts = useCallback(async () => {
+    // Show cached products instantly, then refresh in background
+    const CACHE_KEY = 'ng_products_cache';
+    const CACHE_TTL = 2 * 60 * 1000; // 2 min
+    try {
+      const cached = localStorage.getItem(CACHE_KEY);
+      if (cached) {
+        const { ts, products: cachedProducts } = JSON.parse(cached);
+        if (Date.now() - ts < CACHE_TTL) {
+          setProducts(cachedProducts);
+          setLoading(false);
+          return; // fresh enough — skip network
+        }
+        // Stale: show cached immediately, refresh silently
+        setProducts(cachedProducts);
+        setLoading(false);
+      }
+    } catch { /* ignore */ }
     try {
       const res = await fetch('/api/products');
       const data = await res.json();
-      setProducts(data.products ?? []);
+      const fresh = data.products ?? [];
+      setProducts(fresh);
+      try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), products: fresh })); } catch { /* ignore */ }
     } finally {
       setLoading(false);
     }

@@ -19,7 +19,10 @@ export async function GET(req: NextRequest) {
     const { data, error } = await query;
     if (error) throw error;
 
-    return NextResponse.json({ products: data });
+    return NextResponse.json(
+      { products: data },
+      { headers: { 'Cache-Control': 's-maxage=60, stale-while-revalidate=300' } }
+    );
   } catch (error) {
     console.error('Get products error:', error);
     return NextResponse.json({ error: 'Failed to fetch products' }, { status: 500 });
