@@ -8,11 +8,22 @@ import { formatTime, ORDER_STATUS_COLORS, ORDER_STATUS_LABELS } from '@/lib/util
 import toast from 'react-hot-toast';
 
 type KitchenFilter = 'active' | 'all';
+type KitchenView = 'orders' | 'batch';
+
+// Aggregated item across multiple orders for batch/production view
+interface BatchItem {
+  product_id: string;
+  product_name_en: string;
+  product_name_kn: string;
+  total_qty: number;
+  orders: { token_number: number; order_id: string; qty: number; order_type: string }[];
+}
 
 export default function KitchenPage() {
   const [orders, setOrders] = useState<OrderWithItems[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<KitchenFilter>('active');
+  const [view, setView] = useState<KitchenView>('orders');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const knownOrderIds = useRef<Set<string>>(new Set());
@@ -127,6 +138,42 @@ export default function KitchenPage() {
   const readyCount = orders.filter(o => o.status === 'ready').length;
   const unpaidCount = unpaidOrders.length;
 
+  // ── Batch production view: group paid+ordered items across all orders ──────
+  // Max 5 orders per item group so the chef isn't overwhelmed
+  const MAX_BATCH = 5;
+  const batchItems: BatchItem[] = (() => {
+    const orderedPaid = displayOrders.filter(o => o.status === 'ordered');
+    const map: Record<string, BatchItem> = {};
+    orderedPaid.forEach(order => {
+      (order.order_items ?? []).forEach(item => {
+        if (!map[item.product_id]) {
+          map[item.product_id] = {
+            product_id: item.product_id,
+            product_name_en: item.product_name_en,
+            product_name_kn: item.product_name_kn,
+            total_qty: 0,
+            orders: [],
+          };
+        }
+        const entry = map[item.product_id];
+        entry.total_qty += item.quantity;
+        // Only keep first MAX_BATCH orders in the chip list
+        if (entry.orders.length < MAX_BATCH) {
+          entry.orders.push({
+            token_number: order.token_number,
+            order_id: order.id,
+            qty: item.quantity,
+            order_type: order.order_type,
+          });
+        } else {
+          // Still count qty even if we don't show the chip
+          // (total_qty already incremented above)
+        }
+      });
+    });
+    return Object.values(map).sort((a, b) => b.total_qty - a.total_qty);
+  })();
+
   return (
     <div className="min-h-screen bg-gray-950 text-white" onClick={unlockAudio}>
       {/* Header */}
@@ -175,6 +222,21 @@ export default function KitchenPage() {
               >
                 All Today
               </button>
+              <div className="w-px bg-gray-700 mx-1" />
+              <button
+                onClick={() => setView('orders')}
+                title="Per-order view"
+                className={`px-4 py-2 rounded-lg font-bold text-sm ${view === 'orders' ? 'bg-indigo-600 text-white' : 'bg-gray-800 text-gray-400'}`}
+              >
+                📋 Orders
+              </button>
+              <button
+                onClick={() => setView('batch')}
+                title="Batch production view — grouped by item"
+                className={`px-4 py-2 rounded-lg font-bold text-sm ${view === 'batch' ? 'bg-indigo-600 text-white' : 'bg-gray-800 text-gray-400'}`}
+              >
+                🍳 Batch
+              </button>
             </div>
           </div>
         </div>
@@ -188,14 +250,28 @@ export default function KitchenPage() {
               <div key={i} className="bg-gray-800 rounded-2xl h-64 animate-pulse" />
             ))}
           </div>
+        ) : view === 'batch' ? (
+          <div className="space-y-4">
+            {batchItems.length === 0 ? (
+              <div className="text-center py-24 text-gray-600">
+                <div className="text-6xl mb-4">🍳</div>
+                <p className="text-xl font-bold">No items to batch</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {batchItems.map((item) => (
+                  <BatchCard key={item.product_id} item={item} />
+                ))}
+              </div>
+            )}
+          </div>
         ) : (
           <div className="space-y-6">
-            {/* —— Awaiting Payment —— */}
             {unpaidOrders.length > 0 && (
               <div>
                 <div className="flex items-center gap-2 mb-3">
                   <span className="text-red-400 font-black text-sm uppercase tracking-wide">⏳ Awaiting Payment ({unpaidOrders.length})</span>
-                  <span className="text-gray-500 text-xs">Token hidden until paid — tap “Mark Cash Paid” when customer pays at counter</span>
+                  <span className="text-gray-500 text-xs">Token hidden until paid — tap Mark Cash Paid when customer pays at counter</span>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                   {unpaidOrders.map((order) => (
@@ -211,7 +287,6 @@ export default function KitchenPage() {
               </div>
             )}
 
-            {/* —— Active Cooking Queue —— */}
             {displayOrders.length === 0 && unpaidOrders.length === 0 ? (
               <div className="text-center py-24 text-gray-600">
                 <div className="text-6xl mb-4">🍽️</div>
@@ -375,6 +450,34 @@ function KitchenCard({
             {isUpdating ? '...' : nextLabel[order.status]}
           </button>
         )}
+      </div>
+    </div>
+  );
+}
+
+function BatchCard({ item }: { item: BatchItem }) {
+  return (
+    <div className="bg-indigo-950 border-2 border-indigo-600 rounded-2xl p-5 flex flex-col gap-3">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <p className="text-white font-black text-lg leading-tight">{item.product_name_en}</p>
+          <p className="text-indigo-300 text-sm">{item.product_name_kn}</p>
+        </div>
+        <div className="bg-indigo-600 text-white font-black text-2xl rounded-xl px-3 py-1 whitespace-nowrap">
+          ×{item.total_qty}
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {item.orders.map((o) => (
+          <span
+            key={o.order_id}
+            className="flex items-center gap-1 bg-indigo-800 text-indigo-100 text-xs font-bold px-2 py-1 rounded-lg"
+          >
+            {o.order_type === 'parcel' ? '📦' : '🍽️'}
+            <span>#{o.token_number}</span>
+            {o.qty > 1 && <span className="text-indigo-400">×{o.qty}</span>}
+          </span>
+        ))}
       </div>
     </div>
   );
