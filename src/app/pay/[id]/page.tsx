@@ -182,9 +182,19 @@ export default function PayPage() {
         name: "NG's Cafe — ಒಗ್ಗರಣೆ BOWL",
         description: `Token #${order?.token_number}`,
         order_id: data.razorpay_order_id,
-        handler: () => {
-          // Razorpay confirmed on client side — go to order page immediately
-          // Webhook will confirm on backend; order page polls for final status
+        handler: async (response: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) => {
+          // Verify signature on backend immediately — no webhook wait needed
+          try {
+            await fetch('/api/payments/verify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_signature: response.razorpay_signature,
+              }),
+            });
+          } catch { /* webhook will catch it as fallback */ }
           setPaid(true);
           setPaying(false);
           setTimeout(() => router.push(`/order/${id}`), 800);

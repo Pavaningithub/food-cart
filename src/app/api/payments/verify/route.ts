@@ -1,17 +1,63 @@
 import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'crypto';
 import { createServiceClient } from '@/lib/supabase/server';
 
 /**
  * POST /api/payments/verify
- * Called by Android client after returning from UPI app.
- * Checks Razorpay's API directly for payment status — acts as a fallback
- * in case the webhook hasn't fired yet (network delay, cold start, etc.)
  *
- * Security: amount and status are read from Razorpay's server — never trusted from client.
+ * Two modes:
+ * 1. FAST (checkout callback): receives razorpay_payment_id + razorpay_order_id + razorpay_signature
+ *    → verifies HMAC locally (no external call) → updates DB instantly.
+ * 2. POLL FALLBACK (Android UPI): receives only order_id
+ *    → hits Razorpay API to check status (used when webhook is delayed).
  */
 export async function POST(req: NextRequest) {
   try {
-    const { order_id } = await req.json();
+    const body = await req.json();
+    const { order_id, razorpay_payment_id, razorpay_order_id, razorpay_signature } = body;
+
+    // ── FAST PATH: signature provided by Razorpay checkout handler ──────────
+    if (razorpay_payment_id && razorpay_order_id && razorpay_signature) {
+      const expected = crypto
+        .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET!)
+        .update(`${razorpay_order_id}|${razorpay_payment_id}`)
+        .digest('hex');
+
+      if (expected !== razorpay_signature) {
+        return NextResponse.json({ verified: false, reason: 'invalid_signature' }, { status: 400 });
+      }
+
+      const supabase = createServiceClient();
+
+      // Update order by razorpay_order_id (don't need order_id from client — read from DB)
+      const { data: order } = await supabase
+        .from('orders')
+        .select('id')
+        .eq('razorpay_order_id', razorpay_order_id)
+        .single();
+
+      if (!order) {
+        return NextResponse.json({ verified: false, reason: 'order_not_found' }, { status: 404 });
+      }
+
+      await Promise.all([
+        supabase
+          .from('orders')
+          .update({ payment_status: 'paid', payment_method: 'online', status: 'ordered' })
+          .eq('id', order.id),
+        supabase
+          .from('payments')
+          .update({ status: 'captured', razorpay_payment_id, razorpay_signature })
+          .eq('razorpay_order_id', razorpay_order_id),
+      ]);
+
+      return NextResponse.json({ verified: true });
+    }
+
+    // ── POLL FALLBACK PATH: only order_id provided (Android UPI polling) ────
+    if (!order_id) {
+      return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
+    }
 
     const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!order_id || !UUID_RE.test(order_id)) {
