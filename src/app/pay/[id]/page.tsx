@@ -205,8 +205,9 @@ export default function PayPage() {
         modal: {
           ondismiss: () => {
             setPaying(false);
-            // Start polling quietly — maybe they paid before dismissing
-            startPolling();
+            // Don't show verifying spinner — user explicitly closed the modal.
+            // Webhook will update DB if they somehow completed inside; order page
+            // has its own realtime subscription to catch that.
           },
           escape: true,
         },
