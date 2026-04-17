@@ -34,6 +34,7 @@ export default function PayPage() {
   const [verifying, setVerifying] = useState(false); // polling after UPI app returns
   const [paid, setPaid] = useState(false);
   const [paymentFailed, setPaymentFailed] = useState(false);
+  const [verifyTimedOut, setVerifyTimedOut] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   const [txnId, setTxnId] = useState<string | null>(null);
   // 'upi' = UPI-only via Razorpay | 'razorpay' = full methods
@@ -76,42 +77,44 @@ export default function PayPage() {
 
   useEffect(() => { return () => { if (pollRef.current) clearInterval(pollRef.current); }; }, []);
 
-  // ── Poll until paid — fast at first, then slower ──────────────────────
+  const stopPolling = useCallback(() => {
+    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+    setVerifying(false);
+  }, []);
+
+  // ── Poll until paid — fast at first, then slower, hard stop at 60s ───
   const startPolling = useCallback(() => {
     if (pollRef.current) return;
     setVerifying(true);
+    setVerifyTimedOut(false);
     let ticks = 0;
-    pollRef.current = setInterval(async () => {
-      ticks++;
-      // After 20 fast ticks (20s), slow down to every 3s
-      if (ticks === 20) {
-        clearInterval(pollRef.current!);
-        pollRef.current = setInterval(async () => {
-          const data = await fetch(`/api/orders/${id}`).then((r) => r.json());
-          if (data.order?.payment_status === 'paid') {
-            setPaid(true); setVerifying(false);
-            clearInterval(pollRef.current!); pollRef.current = null;
-            setTimeout(() => router.push(`/order/${id}`), 800);
-          } else if (data.order?.payment_status === 'failed') {
-            setPaymentFailed(true); setVerifying(false);
-            clearInterval(pollRef.current!); pollRef.current = null;
-          }
-        }, 3000);
-        // Stop showing spinner after 60s total — let user retry
-        setTimeout(() => { if (pollRef.current) setVerifying(false); }, 40000);
-        return;
-      }
+    const check = async () => {
       const data = await fetch(`/api/orders/${id}`).then((r) => r.json());
       if (data.order?.payment_status === 'paid') {
-        setPaid(true); setVerifying(false);
-        clearInterval(pollRef.current!); pollRef.current = null;
+        stopPolling();
+        setPaid(true);
         setTimeout(() => router.push(`/order/${id}`), 800);
       } else if (data.order?.payment_status === 'failed') {
-        setPaymentFailed(true); setVerifying(false);
-        clearInterval(pollRef.current!); pollRef.current = null;
+        stopPolling();
+        setPaymentFailed(true);
+      }
+    };
+    pollRef.current = setInterval(async () => {
+      ticks++;
+      if (ticks <= 20) {
+        // Fast phase: every 1s for 20s
+        await check();
+      } else if (ticks <= 40) {
+        // Slow phase: every 3s for next 60s (ticks 21-40 at 3s each = 60s more)
+        if ((ticks - 20) % 3 === 0) await check();
+      } else {
+        // Hard stop at ~80s total — show timed out state
+        stopPolling();
+        setVerifyTimedOut(true);
+        setPaying(false);
       }
     }, 1000);
-  }, [id, router]);
+  }, [id, router, stopPolling]);
 
   // ── visibilitychange: when user returns from UPI app → start polling ─────
   useEffect(() => {
@@ -130,6 +133,7 @@ export default function PayPage() {
     if (paying) return;
     setPaying(true);
     setPaymentFailed(false);
+    setVerifyTimedOut(false);
     setDismissed(false);
     const platform = getPlatform();
 
@@ -325,6 +329,28 @@ export default function PayPage() {
             <p className="text-blue-700 font-bold text-sm">Confirming your payment…</p>
             <p className="text-blue-500 text-xs">Please wait — usually done in a moment</p>
             <p className="text-blue-400 text-xs">Do not close or refresh this page</p>
+          </div>
+        )}
+
+        {/* Timed out — payment not confirmed yet */}
+        {verifyTimedOut && !paid && !paymentFailed && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-2xl px-4 py-4 space-y-2">
+            <p className="text-yellow-800 font-bold text-sm">⏰ Payment not confirmed yet</p>
+            <p className="text-yellow-700 text-xs">Your UPI app may still be processing. If money was deducted, it will appear in your order automatically within a few minutes.</p>
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={() => { setVerifyTimedOut(false); startPolling(); }}
+                className="flex-1 bg-yellow-500 text-white font-bold py-2 rounded-xl text-sm"
+              >
+                Check Again
+              </button>
+              <button
+                onClick={() => router.push(`/order/${id}`)}
+                className="flex-1 bg-white border-2 border-yellow-300 text-yellow-700 font-bold py-2 rounded-xl text-sm"
+              >
+                View Order
+              </button>
+            </div>
           </div>
         )}
 
