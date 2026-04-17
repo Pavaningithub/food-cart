@@ -35,7 +35,7 @@ export default function PayPage() {
   const [paid, setPaid] = useState(false);
   const [paymentFailed, setPaymentFailed] = useState(false);
   // 'upi' = UPI-only via Razorpay | 'razorpay' = full methods
-  const [paymentMode, setPaymentMode] = useState<'razorpay' | 'upi'>('upi');
+  const [paymentMode, setPaymentMode] = useState<'razorpay' | 'upi'>('razorpay');
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoTriggered = useRef(false);
 
@@ -182,9 +182,19 @@ export default function PayPage() {
         name: "NG's Cafe — ಒಗ್ಗರಣೆ BOWL",
         description: `Token #${order?.token_number}`,
         order_id: data.razorpay_order_id,
-        handler: () => {
-          // Razorpay confirmed on client side — go to order page immediately
-          // Webhook will confirm on backend; order page polls for final status
+        handler: async (response: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) => {
+          // Verify signature on backend immediately — no webhook wait needed
+          try {
+            await fetch('/api/payments/verify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_signature: response.razorpay_signature,
+              }),
+            });
+          } catch { /* webhook will catch it as fallback */ }
           setPaid(true);
           setPaying(false);
           setTimeout(() => router.push(`/order/${id}`), 800);
@@ -195,8 +205,9 @@ export default function PayPage() {
         modal: {
           ondismiss: () => {
             setPaying(false);
-            // Start polling quietly — maybe they paid before dismissing
-            startPolling();
+            // Don't show verifying spinner — user explicitly closed the modal.
+            // Webhook will update DB if they somehow completed inside; order page
+            // has its own realtime subscription to catch that.
           },
           escape: true,
         },
@@ -301,8 +312,8 @@ export default function PayPage() {
         {verifying && (
           <div className="bg-blue-50 border border-blue-200 rounded-2xl px-4 py-4 text-center space-y-2">
             <Loader2 size={24} className="animate-spin text-blue-500 mx-auto" />
-            <p className="text-blue-700 font-bold text-sm">Verifying your payment…</p>
-            <p className="text-blue-500 text-xs">Please wait — this usually takes 5–15 seconds</p>
+            <p className="text-blue-700 font-bold text-sm">Confirming your payment…</p>
+            <p className="text-blue-500 text-xs">Please wait — usually done in a moment</p>
             <p className="text-blue-400 text-xs">Do not close or refresh this page</p>
           </div>
         )}
@@ -330,11 +341,11 @@ export default function PayPage() {
             ) : paymentFailed ? (
               <>🔄 Try Again — {formatCurrency(order.total_amount)}</>
             ) : platform === 'android' ? (
-              <>📱 Pay {formatCurrency(order.total_amount)} via UPI</>
+              <>📱 Pay {formatCurrency(order.total_amount)}</>
             ) : paymentMode === 'upi' ? (
               <>📱 Pay {formatCurrency(order.total_amount)} via UPI</>
             ) : (
-              <>💳 Pay {formatCurrency(order.total_amount)}</>
+              <>💳 Pay {formatCurrency(order.total_amount)} via Razorpay</>
             )}
           </button>
         )}
@@ -342,10 +353,10 @@ export default function PayPage() {
         {!verifying && (
           <p className="text-center text-xs text-gray-400">
             {platform === 'android'
-              ? 'Opens GPay · PhonePe · Paytm — payment confirmed automatically'
+              ? 'Opens GPay · PhonePe · Paytm — confirmed automatically'
               : paymentMode === 'upi'
               ? 'Enter your UPI ID (e.g. name@okaxis) — Razorpay sends a collect request'
-              : 'UPI · Cards · Net Banking — secured by Razorpay'}
+              : 'UPI · Cards · Net Banking · Wallets — secured by Razorpay'}
           </p>
         )}
 

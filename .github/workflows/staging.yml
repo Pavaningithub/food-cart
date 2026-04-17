@@ -1,0 +1,102 @@
+# ================================================================
+# STAGING DEPLOYMENT
+# Triggers on: push to `staging` branch
+# Deploys to: Vercel Preview with staging Supabase + test Razorpay
+# ================================================================
+
+name: Deploy — Staging
+
+on:
+  push:
+    branches: [staging]
+  pull_request:
+    branches: [main]      # PRs to main also deploy a preview
+
+concurrency:
+  group: staging-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-typecheck:
+    name: 🔍 Lint & Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run lint --if-present
+      - run: npx tsc --noEmit
+
+  deploy-staging:
+    name: 🚀 Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: lint-typecheck
+    environment:
+      name: staging
+      url: ${{ steps.deploy.outputs.url }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build check
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL:          ${{ secrets.STG_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY:     ${{ secrets.STG_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY:         ${{ secrets.STG_SUPABASE_SERVICE_ROLE_KEY }}
+          NEXT_PUBLIC_RAZORPAY_KEY_ID:       ${{ secrets.STG_RAZORPAY_KEY_ID }}
+          RAZORPAY_KEY_ID:                   ${{ secrets.STG_RAZORPAY_KEY_ID }}
+          RAZORPAY_KEY_SECRET:               ${{ secrets.STG_RAZORPAY_KEY_SECRET }}
+          RAZORPAY_WEBHOOK_SECRET:           ${{ secrets.STG_RAZORPAY_WEBHOOK_SECRET }}
+          NEXT_PUBLIC_APP_URL:               ${{ secrets.STG_APP_URL }}
+          ADMIN_PIN:                         ${{ secrets.STG_ADMIN_PIN }}
+          KITCHEN_KEY:                       ${{ secrets.STG_KITCHEN_KEY }}
+          NEXT_PUBLIC_KITCHEN_KEY:           ${{ secrets.STG_KITCHEN_KEY }}
+
+      - name: Apply DB migrations to staging
+        run: npx supabase db push --linked --yes
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD:  ${{ secrets.STG_SUPABASE_DB_PASSWORD }}
+
+      - name: Deploy to Vercel (Staging)
+        id: deploy
+        run: |
+          url=$(npx vercel deploy \
+            --token=${{ secrets.VERCEL_TOKEN }} \
+            --env NEXT_PUBLIC_SUPABASE_URL=${{ secrets.STG_SUPABASE_URL }} \
+            --env NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.STG_SUPABASE_ANON_KEY }} \
+            --env SUPABASE_SERVICE_ROLE_KEY=${{ secrets.STG_SUPABASE_SERVICE_ROLE_KEY }} \
+            --env NEXT_PUBLIC_RAZORPAY_KEY_ID=${{ secrets.STG_RAZORPAY_KEY_ID }} \
+            --env RAZORPAY_KEY_ID=${{ secrets.STG_RAZORPAY_KEY_ID }} \
+            --env RAZORPAY_KEY_SECRET=${{ secrets.STG_RAZORPAY_KEY_SECRET }} \
+            --env RAZORPAY_WEBHOOK_SECRET=${{ secrets.STG_RAZORPAY_WEBHOOK_SECRET }} \
+            --env NEXT_PUBLIC_APP_URL=${{ secrets.STG_APP_URL }} \
+            --env ADMIN_PIN=${{ secrets.STG_ADMIN_PIN }} \
+            --env KITCHEN_KEY=${{ secrets.STG_KITCHEN_KEY }} \
+            --env NEXT_PUBLIC_KITCHEN_KEY=${{ secrets.STG_KITCHEN_KEY }} \
+            2>&1 | tail -1)
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "✅ Staging: $url"
+
+      - name: Comment PR with staging URL
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## 🧪 Staging Preview Ready\n\n🔗 **URL:** ${{ steps.deploy.outputs.url }}\n\n> ⚠️ Uses staging Supabase + test Razorpay keys. Safe to test.\n\n**Checklist before merging to main:**\n- [ ] Tested all order flows\n- [ ] Tested payment (Razorpay test mode)\n- [ ] Kitchen display working\n- [ ] Admin dashboard working`
+            })
