@@ -145,6 +145,43 @@ export default function OrdersTab() {
 
                   {order.notes && <p className="text-sm text-yellow-700 bg-yellow-50 rounded-lg px-3 py-2 mb-3">📝 {order.notes}</p>}
 
+                  {/* Payment details */}
+                  {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                  {(order as any).payments && (
+                    <div className="bg-blue-50 rounded-xl px-3 py-2 mb-3 text-xs space-y-1">
+                      <p className="font-bold text-blue-700 mb-1">💳 Payment Record</p>
+                      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                      {(order as any).payments.razorpay_payment_id && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Txn ID</span>
+                          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                          <span className="font-mono text-blue-800">{(order as any).payments.razorpay_payment_id}</span>
+                        </div>
+                      )}
+                      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                      {(order as any).payments.razorpay_order_id && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Razorpay Order</span>
+                          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                          <span className="font-mono text-blue-800 text-right max-w-[160px] truncate">{(order as any).payments.razorpay_order_id}</span>
+                        </div>
+                      )}
+                      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                      {(order as any).payments.method && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Method</span>
+                          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                          <span className="font-semibold capitalize text-blue-800">{(order as any).payments.method}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Status</span>
+                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                        <span className="font-semibold uppercase text-blue-800">{(order as any).payments.status}</span>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Actions */}
                   <div className="flex flex-wrap gap-2">
                     <select

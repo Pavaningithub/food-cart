@@ -11,7 +11,7 @@ export async function GET(
 
     const { data, error } = await supabase
       .from('orders')
-      .select('*, order_items(*)')
+      .select('*, order_items(*), payments(*)')
       .eq('id', id)
       .single();
 
