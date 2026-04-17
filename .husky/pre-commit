@@ -1,0 +1,17 @@
+#!/bin/sh
+# Block commits containing hardcoded secrets or credentials
+
+PATTERNS='rzp_live_[A-Za-z0-9]{14}|sb_secret_[A-Za-z0-9_-]{20}|vcp_[A-Za-z0-9]{40}|vca_[A-Za-z0-9]{40}'
+
+STAGED=$(git diff --cached --name-only | grep -v "^\.husky/")
+if [ -z "$STAGED" ]; then exit 0; fi
+
+FOUND=$(echo "$STAGED" | xargs grep -rn -E "$PATTERNS" 2>/dev/null | grep -v "process\.env\|\${{")
+if [ -n "$FOUND" ]; then
+  echo ""
+  echo "🚫 COMMIT BLOCKED — hardcoded secret detected:"
+  echo "$FOUND"
+  echo ""
+  echo "Use process.env.YOUR_VAR instead of hardcoding credentials."
+  exit 1
+fi
