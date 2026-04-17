@@ -405,14 +405,6 @@ export default function PayPage() {
           </p>
         )}
 
-        {/* Cash fallback — always visible */}
-        <button
-          onClick={() => router.push(`/order/${id}?cash=1`)}
-          className="w-full bg-white border-2 border-gray-200 hover:border-brand/40 text-gray-600 font-semibold py-3.5 rounded-2xl transition-all flex items-center justify-center gap-2"
-        >
-          <ShoppingBag size={18} />
-          Pay at counter instead (Cash)
-        </button>
       </div>
     </div>
   );

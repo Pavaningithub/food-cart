@@ -219,13 +219,6 @@ export default function CheckoutPage() {
           >
             {loading ? '...' : `💳 Pay Online — ${formatCurrency(total)}`}
           </button>
-          <button
-            onClick={() => handlePlaceOrder('cash')}
-            disabled={loading}
-            className="w-full bg-white border-2 border-gray-200 hover:border-brand/40 text-gray-700 font-bold text-base py-3.5 rounded-2xl transition-all active:scale-98 disabled:opacity-60"
-          >
-            💵 Pay at Counter (Cash)
-          </button>
         </div>
       </div>
     </div>
