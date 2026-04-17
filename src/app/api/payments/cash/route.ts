@@ -7,16 +7,22 @@ export async function POST(req: NextRequest) {
     const { order_id, pin } = await req.json();
     const supabase = createServiceClient();
 
-    // Verify admin PIN
-    const { data: pinSetting } = await supabase
-      .from('settings')
-      .select('value')
-      .eq('key', 'admin_pin')
-      .single();
+    // Allow kitchen bypass key (no PIN needed on staff kitchen display)
+    const kitchenKey = process.env.KITCHEN_KEY;
+    const isKitchenBypass = kitchenKey && pin === kitchenKey;
 
-    const adminPin = process.env.ADMIN_PIN ?? pinSetting?.value ?? '1234';
-    if (pin !== adminPin) {
-      return NextResponse.json({ error: 'Invalid PIN' }, { status: 403 });
+    if (!isKitchenBypass) {
+      // Verify admin PIN
+      const { data: pinSetting } = await supabase
+        .from('settings')
+        .select('value')
+        .eq('key', 'admin_pin')
+        .single();
+
+      const adminPin = process.env.ADMIN_PIN ?? pinSetting?.value ?? '1234';
+      if (pin !== adminPin) {
+        return NextResponse.json({ error: 'Invalid PIN' }, { status: 403 });
+      }
     }
 
     // Update order

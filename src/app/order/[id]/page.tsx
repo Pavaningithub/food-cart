@@ -117,27 +117,42 @@ export default function OrderStatusPage() {
 
   return (
     <div className="max-w-lg mx-auto pb-8">
-      {/* Hero token */}
-      <div className={`text-white px-6 py-8 text-center transition-all ${isReady ? 'bg-green-600' : 'bg-brand'}`}>
-        {isReady && <p className="text-2xl mb-1">🔔</p>}
-        <p className="text-sm font-medium opacity-80 mb-1">
-          {isReady ? 'Your order is ready! 🎉' : 'Token Number'}
-        </p>
-        <div className="text-8xl font-black tabular-nums">{order.token_number}</div>
-        <p className="mt-2 font-bold text-lg opacity-90">
-          {ORDER_STATUS_LABELS[order.status]}
-        </p>
-        <p className="text-xs opacity-70 mt-1">
-          {order.order_type === 'parcel' ? '📦 Parcel' : '🍽️ Dine In'} · {formatTime(order.created_at)}
-        </p>
-        {/* Realtime connection indicator */}
-        <div className="mt-3 flex items-center justify-center gap-1.5">
-          <span className={`w-2 h-2 rounded-full ${connected ? 'bg-green-300 animate-pulse' : 'bg-yellow-300'}`} />
-          <span className="text-xs opacity-60">{connected ? 'Live updates on' : 'Connecting...'}</span>
+      {/* Hero token — only show after payment confirmed */}
+      {order.payment_status !== 'paid' ? (
+        <div className={`text-white px-6 py-8 text-center ${
+          order.payment_status === 'failed' ? 'bg-red-700' : 'bg-gray-700'
+        }`}>
+          <p className="text-5xl mb-3">{order.payment_status === 'failed' ? '❌' : '⏳'}</p>
+          <p className="text-xl font-black">
+            {order.payment_status === 'failed' ? 'Payment Failed' : 'Awaiting Payment'}
+          </p>
+          <p className="text-sm opacity-75 mt-2">
+            {isCash
+              ? 'Please pay at the counter — staff will confirm'
+              : order.payment_status === 'failed'
+              ? 'Your money was not deducted. Try again below.'
+              : 'Complete your payment to see your token number'}
+          </p>
         </div>
-      </div>
-
-      <div className="px-4 pt-5 space-y-4">
+      ) : (
+        <div className={`text-white px-6 py-8 text-center transition-all ${isReady ? 'bg-green-600' : 'bg-brand'}`}>
+          {isReady && <p className="text-2xl mb-1">🔔</p>}
+          <p className="text-sm font-medium opacity-80 mb-1">
+            {isReady ? 'Your order is ready! 🎉' : 'Token Number'}
+          </p>
+          <div className="text-8xl font-black tabular-nums">{order.token_number}</div>
+          <p className="mt-2 font-bold text-lg opacity-90">
+            {ORDER_STATUS_LABELS[order.status]}
+          </p>
+          <p className="text-xs opacity-70 mt-1">
+            {order.order_type === 'parcel' ? '📦 Parcel' : '🍽️ Dine In'} · {formatTime(order.created_at)}
+          </p>
+          <div className="mt-3 flex items-center justify-center gap-1.5">
+            <span className={`w-2 h-2 rounded-full ${connected ? 'bg-green-300 animate-pulse' : 'bg-yellow-300'}`} />
+            <span className="text-xs opacity-60">{connected ? 'Live updates on' : 'Connecting...'}</span>
+          </div>
+        </div>
+      )}      <div className="px-4 pt-5 space-y-4">
         {/* Payment status banners */}
         {isCash && order.payment_status === 'unpaid' && (
           <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 text-center">

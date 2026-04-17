@@ -244,6 +244,138 @@ function DailyReportSection() {
   );
 }
 
+// ── Token Reset Section ────────────────────────────────────────────────────
+function TokenResetSection() {
+  const [pin, setPin] = useState('');
+  const [note, setNote] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [info, setInfo] = useState<{ current_token: number; total_orders_ever: number; resets: { id: string; reset_at: string; reset_date: string; tokens_used: number; total_orders: number; note: string | null }[] } | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
+
+  const fetchInfo = async () => {
+    const res = await fetch('/api/admin/token-reset');
+    if (res.ok) setInfo(await res.json());
+  };
+
+  useEffect(() => { fetchInfo(); }, []);
+
+  const handleReset = async () => {
+    if (!confirmed) { setConfirmed(true); return; }
+    if (pin.length !== 4) return toast.error('Enter 4-digit PIN');
+    setLoading(true);
+    try {
+      const res = await fetch('/api/admin/token-reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin, note: note || `Reset by admin on ${new Date().toLocaleDateString('en-IN')}` }),
+      });
+      if (res.status === 403) { toast.error('Wrong PIN'); return; }
+      if (!res.ok) throw new Error();
+      toast.success('Token counter reset! Next order starts at #1 🔄');
+      setPin(''); setNote(''); setConfirmed(false);
+      fetchInfo();
+    } catch {
+      toast.error('Reset failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-2xl shadow-sm p-5">
+      <h3 className="font-black text-gray-800 mb-1 text-lg">🔢 Token Counter Reset</h3>
+      <p className="text-gray-500 text-sm mb-4">
+        Reset today&apos;s token back to #1 for easy announcement. All order history is preserved — total orders served is never lost.
+      </p>
+
+      {info && (
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          <div className="bg-orange-50 rounded-xl p-3 text-center">
+            <p className="text-3xl font-black text-orange-700">#{info.current_token}</p>
+            <p className="text-xs text-orange-500 font-semibold">Current Token</p>
+          </div>
+          <div className="bg-blue-50 rounded-xl p-3 text-center">
+            <p className="text-3xl font-black text-blue-700">{info.total_orders_ever}</p>
+            <p className="text-xs text-blue-500 font-semibold">Total Orders Ever</p>
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-3 max-w-sm">
+        <div>
+          <label className="text-sm font-bold text-gray-700">Note (optional)</label>
+          <input
+            type="text"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="e.g. End of lunch rush"
+            className="mt-1 w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-orange-400"
+          />
+        </div>
+        <div>
+          <label className="text-sm font-bold text-gray-700">Admin PIN</label>
+          <input
+            type="password"
+            maxLength={4}
+            value={pin}
+            onChange={(e) => { setPin(e.target.value); setConfirmed(false); }}
+            className="mt-1 w-full border rounded-xl px-3 py-2.5 text-sm tracking-widest focus:outline-none focus:border-orange-400"
+            placeholder="••••"
+          />
+        </div>
+        {confirmed && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm text-amber-800">
+            ⚠️ This will reset today&apos;s token to #1. Click again to confirm.
+          </div>
+        )}
+        <button
+          onClick={handleReset}
+          disabled={loading || pin.length !== 4}
+          className={`w-full py-2.5 rounded-xl font-bold text-sm transition-all disabled:opacity-60 ${
+            confirmed ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-orange-500 hover:bg-orange-600 text-white'
+          }`}
+        >
+          {loading ? 'Resetting…' : confirmed ? '⚠️ Confirm Reset to #1' : '🔄 Reset Token Counter'}
+        </button>
+      </div>
+
+      {/* History */}
+      {info && info.resets.length > 0 && (
+        <div className="mt-4">
+          <button
+            onClick={() => setShowHistory((v) => !v)}
+            className="text-sm font-bold text-gray-500 hover:text-gray-800 flex items-center gap-1"
+          >
+            {showHistory ? '▲' : '▼'} Reset History ({info.resets.length} resets)
+          </button>
+          {showHistory && (
+            <div className="mt-3 space-y-2 max-h-64 overflow-y-auto">
+              {info.resets.map((r) => (
+                <div key={r.id} className="flex items-start justify-between bg-gray-50 rounded-xl px-4 py-3">
+                  <div>
+                    <p className="text-sm font-bold text-gray-700">
+                      {r.reset_date} — tokens used: <span className="text-orange-600">#{r.tokens_used}</span>
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      {new Date(r.reset_at).toLocaleString('en-IN')}
+                      {r.note && <span> · {r.note}</span>}
+                    </p>
+                  </div>
+                  <div className="text-right ml-4 shrink-0">
+                    <p className="text-xs font-semibold text-blue-600">{r.total_orders} total orders</p>
+                    <p className="text-xs text-gray-400">in system</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function SettingsTab() {
   const [settings, setSettings] = useState<Setting[]>([]);
   const [loading, setLoading] = useState(true);
@@ -330,6 +462,9 @@ export default function SettingsTab() {
 
       {/* Change PIN */}
       <ChangePinSection />
+
+      {/* Token Counter Reset */}
+      <TokenResetSection />
 
       {/* Daily Report */}
       <DailyReportSection />

@@ -250,12 +250,20 @@ export default function PayPage() {
 
   return (
     <div className="max-w-lg mx-auto min-h-screen flex flex-col">
-      {/* Token hero */}
+      {/* Token hero — only reveal after paid */}
       <div className="bg-brand text-white px-6 pt-10 pb-8 text-center">
-        <p className="text-brand-light text-sm font-semibold tracking-wide uppercase mb-1">Your Token</p>
-        <div className="text-8xl font-black tabular-nums leading-none">{order.token_number}</div>
+        <p className="text-brand-light text-sm font-semibold tracking-wide uppercase mb-1">
+          {paid ? 'Your Token' : 'Complete Payment'}
+        </p>
+        {paid ? (
+          <div className="text-8xl font-black tabular-nums leading-none">{order.token_number}</div>
+        ) : (
+          <div className="text-6xl font-black tabular-nums leading-none opacity-30">- - -</div>
+        )}
         <p className="text-cream mt-3 font-medium text-base">
-          {order.order_type === 'parcel' ? '📦 Parcel Order' : '🍽️ Dine In'}
+          {paid
+            ? (order.order_type === 'parcel' ? '📦 Parcel Order' : '🍽️ Dine In')
+            : 'Token revealed after payment'}
         </p>
       </div>
 

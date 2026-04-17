@@ -97,14 +97,35 @@ export default function KitchenPage() {
     setSoundEnabled(v => !v);
   };
 
-  const displayOrders = orders.filter((o) => {
+  const markCashPaid = async (orderId: string) => {
+    setUpdatingId(orderId);
+    try {
+      const res = await fetch('/api/payments/cash', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order_id: orderId, pin: process.env.NEXT_PUBLIC_KITCHEN_KEY }),
+      });
+      if (!res.ok) throw new Error('Failed');
+      toast.success('Cash payment confirmed! ✅');
+      await fetchOrders();
+    } catch {
+      toast.error('Failed to confirm payment');
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const allDisplayOrders = orders.filter((o) => {
     if (o.status === 'cancelled') return false;
     if (filter === 'active') return ['ordered', 'ready'].includes(o.status);
     return true;
   });
+  const unpaidOrders = allDisplayOrders.filter(o => o.payment_status !== 'paid');
+  const displayOrders = allDisplayOrders.filter(o => o.payment_status === 'paid');
 
-  const pendingCount = orders.filter(o => o.status === 'ordered').length;
+  const pendingCount = orders.filter(o => o.status === 'ordered' && o.payment_status === 'paid').length;
   const readyCount = orders.filter(o => o.status === 'ready').length;
+  const unpaidCount = unpaidOrders.length;
 
   return (
     <div className="min-h-screen bg-gray-950 text-white" onClick={unlockAudio}>
@@ -126,6 +147,12 @@ export default function KitchenPage() {
               <div className="text-2xl font-black text-green-400">{readyCount}</div>
               <div className="text-xs text-gray-400">Ready</div>
             </div>
+            {unpaidCount > 0 && (
+              <div className="text-center">
+                <div className="text-2xl font-black text-red-400">{unpaidCount}</div>
+                <div className="text-xs text-gray-400">Unpaid</div>
+              </div>
+            )}
             <button
               onClick={(e) => { e.stopPropagation(); toggleSound(); }}
               title={soundEnabled ? 'Mute alerts' : 'Unmute alerts'}
@@ -161,21 +188,54 @@ export default function KitchenPage() {
               <div key={i} className="bg-gray-800 rounded-2xl h-64 animate-pulse" />
             ))}
           </div>
-        ) : displayOrders.length === 0 ? (
-          <div className="text-center py-24 text-gray-600">
-            <div className="text-6xl mb-4">🍽️</div>
-            <p className="text-xl font-bold">No active orders</p>
-          </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {displayOrders.map((order) => (
-              <KitchenCard
-                key={order.id}
-                order={order}
-                onStatusChange={updateStatus}
-                isUpdating={updatingId === order.id}
-              />
-            ))}
+          <div className="space-y-6">
+            {/* —— Awaiting Payment —— */}
+            {unpaidOrders.length > 0 && (
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-red-400 font-black text-sm uppercase tracking-wide">⏳ Awaiting Payment ({unpaidOrders.length})</span>
+                  <span className="text-gray-500 text-xs">Token hidden until paid — tap “Mark Cash Paid” when customer pays at counter</span>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {unpaidOrders.map((order) => (
+                    <KitchenCard
+                      key={order.id}
+                      order={order}
+                      onStatusChange={updateStatus}
+                      onMarkPaid={markCashPaid}
+                      isUpdating={updatingId === order.id}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* —— Active Cooking Queue —— */}
+            {displayOrders.length === 0 && unpaidOrders.length === 0 ? (
+              <div className="text-center py-24 text-gray-600">
+                <div className="text-6xl mb-4">🍽️</div>
+                <p className="text-xl font-bold">No active orders</p>
+              </div>
+            ) : displayOrders.length > 0 && (
+              <div>
+                {unpaidOrders.length > 0 && (
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-orange-400 font-black text-sm uppercase tracking-wide">🔥 Cooking Queue ({displayOrders.length})</span>
+                  </div>
+                )}
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {displayOrders.map((order) => (
+                    <KitchenCard
+                      key={order.id}
+                      order={order}
+                      onStatusChange={updateStatus}
+                      isUpdating={updatingId === order.id}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -186,10 +246,12 @@ export default function KitchenPage() {
 function KitchenCard({
   order,
   onStatusChange,
+  onMarkPaid,
   isUpdating,
 }: {
   order: OrderWithItems;
   onStatusChange: (id: string, status: string) => void;
+  onMarkPaid?: (id: string) => void;
   isUpdating: boolean;
 }) {
   const isReady = order.status === 'ready';
@@ -291,7 +353,16 @@ function KitchenCard({
         <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${ORDER_STATUS_COLORS[order.status]}`}>
           {ORDER_STATUS_LABELS[order.status]}
         </span>
-        {nextStatus[order.status] && (
+        {!isPaid && onMarkPaid && (
+          <button
+            onClick={() => onMarkPaid(order.id)}
+            disabled={isUpdating}
+            className="w-full mt-2 py-2.5 rounded-xl font-bold text-sm transition-all disabled:opacity-60 bg-emerald-600 hover:bg-emerald-500 text-white"
+          >
+            {isUpdating ? '...' : '✅ Mark Cash Paid'}
+          </button>
+        )}
+        {isPaid && nextStatus[order.status] && (
           <button
             onClick={() => onStatusChange(order.id, nextStatus[order.status])}
             disabled={isUpdating}
